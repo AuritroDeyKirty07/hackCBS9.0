@@ -60,13 +60,21 @@ export function setupWorkerNamespace(io) {
 
         currentWorkerId = workerId;
 
-        // Upsert worker record in DB
+        const workerName = name || `worker-${workerId.slice(0, 4)}`;
+
+        // Remove any old duplicate records for this worker name
+        await Worker.deleteMany({
+          name: workerName,
+          workerId: { $ne: workerId },
+        });
+
+        // Upsert worker record in DB by unique name
         const worker = await Worker.findOneAndUpdate(
-          { workerId },
+          { name: workerName },
           {
             workerId,
             owner: socket.userId || null,
-            name: name || `worker-${workerId.slice(0, 4)}`,
+            name: workerName,
             platform: platform || 'unknown',
             cpuCores: cpuCores || 1,
             totalRamMB: totalRamMB || 1024,
@@ -176,13 +184,13 @@ export function setupWorkerNamespace(io) {
 
         // DUPLICATE / LATE RESULT PROTECTION
         if (task.status === TASK_STATUS.COMPLETED) {
-          console.warn(`[WorkerNamespace] Ignoring late result for already completed task: ${taskId}`);
+          console.log(`[WorkerNamespace] Task #${task.index} is already completed. Discarding duplicate result.`);
           return;
         }
 
         if (task.attempt !== attempt) {
-          console.warn(
-            `[WorkerNamespace] Ignoring stale attempt result for task: ${taskId}. Received attempt ${attempt}, current is ${task.attempt}`
+          console.log(
+            `[WorkerNamespace] Discarding stale attempt result for task #${task.index} (received attempt ${attempt}, current is ${task.attempt})`
           );
           return;
         }

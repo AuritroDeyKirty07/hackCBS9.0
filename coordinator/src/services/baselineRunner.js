@@ -14,6 +14,7 @@ function mulberry32(seed) {
 
 /**
  * Runs single-machine baseline calculation for a job.
+ * Executes on a single core sequentially without cluster parallelization.
  * @param {string|mongoose.Types.ObjectId} jobId
  * @returns {Promise<Object>}
  */
@@ -26,14 +27,16 @@ export async function runBaseline(jobId) {
   if (job.type === TASK_TYPES.IMAGE_BATCH_PROCESS) {
     const totalImages = parseInt(job.params?.totalImages, 10) || 24;
     const filterType = job.params?.filterType || 'EDGE_SOBEL';
+    const width = parseInt(job.params?.width, 10) || 240;
+    const height = parseInt(job.params?.height, 10) || 180;
 
-    // Run sequentially on single core
+    // Run all images sequentially on single core
     runImageBatchProcess({
       startIndex: 0,
       count: totalImages,
       filterType,
-      width: 160,
-      height: 120,
+      width,
+      height,
     });
 
     const durationMs = Date.now() - startTime;

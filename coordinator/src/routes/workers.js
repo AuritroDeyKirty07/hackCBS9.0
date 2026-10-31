@@ -5,13 +5,34 @@ const router = express.Router();
 
 /**
  * GET /api/workers
- * List all workers with live status and metrics
+ * List all workers with live status and metrics.
+ * Automatically deduplicates by worker name so a machine never appears multiple times.
  */
 router.get('/', async (req, res, next) => {
   try {
-    const workers = await Worker.find()
+    // Sort so 'online' workers take precedence over 'offline'
+    const rawWorkers = await Worker.find()
       .populate('owner', 'name email')
-      .sort({ updatedAt: -1 });
+      .sort({ status: 1, updatedAt: -1 });
+
+    const seenNames = new Set();
+    const workers = [];
+    const staleIds = [];
+
+    for (const w of rawWorkers) {
+      if (!seenNames.has(w.name)) {
+        seenNames.add(w.name);
+        workers.push(w);
+      } else {
+        // Collect duplicate records to delete
+        staleIds.push(w._id);
+      }
+    }
+
+    // Clean up duplicate historical records in DB
+    if (staleIds.length > 0) {
+      Worker.deleteMany({ _id: { $in: staleIds } }).catch(() => {});
+    }
 
     res.json({ workers });
   } catch (err) {
@@ -38,4 +59,3 @@ router.get('/:workerId', async (req, res, next) => {
 });
 
 export default router;
-

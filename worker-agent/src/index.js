@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
@@ -19,20 +20,23 @@ const WORKER_TOKEN = process.env.WORKER_TOKEN || 'meshcompute-dev-token';
 const WORKER_NAME = process.env.WORKER_NAME || `worker-${Math.floor(Math.random() * 900 + 100)}`;
 const MAX_CONCURRENT_TASKS = parseInt(process.env.MAX_CONCURRENT_TASKS || '4', 10);
 
-// Persist workerId across restarts
-const idFilePath = path.resolve(process.cwd(), `.worker-id-${WORKER_NAME}`);
+// Deterministic workerId based on WORKER_NAME (survives restarts in any directory)
+const sanitizedName = WORKER_NAME.replace(/[^a-zA-Z0-9_-]/g, '_');
+const idFilePath = path.resolve(os.homedir(), `.meshcompute-worker-${sanitizedName}.id`);
 let workerId;
 
 try {
   if (fs.existsSync(idFilePath)) {
     workerId = fs.readFileSync(idFilePath, 'utf8').trim();
   }
-  if (!workerId) {
-    workerId = crypto.randomUUID();
+} catch (e) {}
+
+if (!workerId) {
+  const hash = crypto.createHash('sha256').update(`meshcompute-${WORKER_NAME}-${os.hostname()}`).digest('hex');
+  workerId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+  try {
     fs.writeFileSync(idFilePath, workerId, 'utf8');
-  }
-} catch (err) {
-  workerId = crypto.randomUUID();
+  } catch (e) {}
 }
 
 console.log(`=================================================`);
@@ -56,7 +60,6 @@ const socket = io(`${COORDINATOR_URL}/workers`, {
 socket.on('connect', () => {
   console.log(`[Worker] Connected to coordinator with socket id: ${socket.id}`);
 
-  // 1. Register with coordinator
   socket.emit(WS_EVENTS.WORKER_REGISTER, {
     workerId,
     name: WORKER_NAME,
@@ -66,7 +69,6 @@ socket.on('connect', () => {
     maxConcurrentTasks: MAX_CONCURRENT_TASKS,
   });
 
-  // 2. Start heartbeat loop
   if (heartbeatInterval) clearInterval(heartbeatInterval);
   heartbeatInterval = setInterval(() => {
     const dynamic = getDynamicMetrics();
@@ -84,13 +86,11 @@ socket.on(WS_EVENTS.WORKER_REGISTERED, (data) => {
   console.log(`[Worker] Registration confirmed by coordinator:`, data);
 });
 
-// Handle assigned computational task
 socket.on(WS_EVENTS.TASK_ASSIGN, async (taskData) => {
   const { taskId, jobId, index, attempt, type, params } = taskData;
   activeTasks++;
   console.log(`[Worker] Received task #${index} (job: ${jobId}, attempt: ${attempt})`);
 
-  // Notify coordinator that task has started
   socket.emit(WS_EVENTS.TASK_STARTED, { taskId, attempt });
 
   try {
@@ -134,4 +134,3 @@ process.on('SIGINT', () => {
   socket.disconnect();
   process.exit(0);
 });
-
