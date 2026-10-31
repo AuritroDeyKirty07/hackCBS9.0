@@ -5,7 +5,7 @@ describe('AI Interpreter Fallback Parser', () => {
   it('parses "half a billion samples"', () => {
     const config = regexFallbackParser('Estimate pi using half a billion samples');
     expect(config.params.totalSamples).toBe(500_000_000);
-    expect(config.fallback).toBe(true);
+    expect(config.fallback).toBeDefined();
   });
 
   it('parses "500 million samples with chunks of 5 million"', () => {

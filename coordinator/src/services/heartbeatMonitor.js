@@ -61,6 +61,7 @@ export async function requeueWorkerTasks(worker, reason, io) {
       task.attempt += 1;
       task.assignedTo = null;
       task.assignedWorkerId = null;
+      task.assignedWorkerName = null;
       task.assignedAt = null;
       await task.save();
       shouldReschedule = true;

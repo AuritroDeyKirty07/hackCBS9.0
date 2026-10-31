@@ -1,6 +1,7 @@
 import express from 'express';
 import { Job } from '../models/Job.js';
 import { Task } from '../models/Task.js';
+import { Worker } from '../models/Worker.js';
 import { TASK_TYPES, JOB_STATUS, LIMITS, DASH_EVENTS } from 'meshcompute-shared/constants.js';
 import { splitJobIntoTasks } from '../services/jobSplitter.js';
 import { runScheduler } from '../services/scheduler.js';
@@ -129,9 +130,24 @@ router.get('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Job not found' });
     }
 
-    const tasks = await Task.find({ job: job._id }).sort({ index: 1 });
+    const tasks = await Task.find({ job: job._id })
+      .populate('assignedTo', 'name workerId')
+      .sort({ index: 1 });
 
-    res.json({ job, tasks });
+    // Map worker IDs to computer names for any historic tasks missing assignedWorkerName
+    const workers = await Worker.find({}, 'workerId name');
+    const workerMap = new Map(workers.map((w) => [w.workerId, w.name]));
+
+    const populatedTasks = tasks.map((t) => {
+      const doc = t.toObject();
+      if (!doc.assignedWorkerName) {
+        doc.assignedWorkerName =
+          doc.assignedTo?.name || workerMap.get(doc.assignedWorkerId) || doc.assignedWorkerId;
+      }
+      return doc;
+    });
+
+    res.json({ job, tasks: populatedTasks });
   } catch (err) {
     next(err);
   }

@@ -44,9 +44,9 @@ async function startDemo() {
   // Wait 2 seconds for Coordinator to start
   await new Promise((r) => setTimeout(r, 2000));
 
-  // 3. Start 3 Worker Agents
+  // 3. Start 1 Local Worker Agent (Host laptop + Friend's laptop = clean 2-node cluster)
   const workerToken = 'meshcompute-demo-worker-token';
-  const workerNames = ['worker-alpha', 'worker-beta', 'worker-gamma'];
+  const workerNames = ['worker-alpha'];
 
   for (const name of workerNames) {
     console.log(`[Demo] Spawning ${name}...`);
@@ -70,7 +70,7 @@ async function startDemo() {
   console.log('  🌐 Frontend Dashboard: http://localhost:5173');
   console.log('  ⚙️ Backend Coordinator: http://localhost:4000');
   console.log('  🔑 Demo Credentials:   demo@meshcompute.ai / password123');
-  console.log('  💻 Worker Nodes:       3 active workers connected');
+  console.log('  💻 Worker Nodes:       1 local worker connected (worker-alpha)');
   console.log('===============================================================\n');
 }
 

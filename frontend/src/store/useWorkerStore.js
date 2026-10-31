@@ -16,6 +16,28 @@ export const useWorkerStore = create((set, get) => ({
     }
   },
 
+  deleteWorker: async (workerId) => {
+    try {
+      await api.delete(`/workers/${workerId}`);
+      set((state) => ({
+        workers: state.workers.filter((w) => w.workerId !== workerId && w._id !== workerId),
+      }));
+    } catch (err) {
+      console.error('Failed to delete worker:', err);
+    }
+  },
+
+  cleanupOfflineWorkers: async () => {
+    try {
+      await api.delete('/workers/cleanup/offline');
+      set((state) => ({
+        workers: state.workers.filter((w) => w.status === 'online'),
+      }));
+    } catch (err) {
+      console.error('Failed to cleanup offline workers:', err);
+    }
+  },
+
   handleWorkerUpdate: (updatedWorker) => {
     set((state) => {
       const index = state.workers.findIndex((w) => w.workerId === updatedWorker.workerId);

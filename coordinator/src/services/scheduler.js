@@ -107,6 +107,7 @@ export async function runScheduler(io) {
       task.status = TASK_STATUS.ASSIGNED;
       task.assignedTo = selectedWorker.doc._id;
       task.assignedWorkerId = selectedWorker.doc.workerId;
+      task.assignedWorkerName = selectedWorker.doc.name;
       task.assignedAt = new Date();
       await task.save();
 
@@ -146,6 +147,8 @@ export async function runScheduler(io) {
         index: task.index,
         status: task.status,
         workerId: selectedWorker.doc.workerId,
+        workerName: selectedWorker.doc.name,
+        assignedWorkerName: selectedWorker.doc.name,
         attempt: task.attempt,
       });
 

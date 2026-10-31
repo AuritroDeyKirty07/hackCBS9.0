@@ -88,7 +88,12 @@ export const useJobStore = create((set, get) => ({
         );
         if (index >= 0) {
           nextTasks = [...nextTasks];
-          nextTasks[index] = { ...nextTasks[index], ...updatedTask };
+          const workerName = updatedTask.workerName || updatedTask.assignedWorkerName;
+          nextTasks[index] = {
+            ...nextTasks[index],
+            ...updatedTask,
+            assignedWorkerName: workerName || nextTasks[index].assignedWorkerName,
+          };
         }
       }
       return { currentTasks: nextTasks };

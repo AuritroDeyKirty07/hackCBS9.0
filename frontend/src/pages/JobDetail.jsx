@@ -397,8 +397,15 @@ export default function JobDetail() {
                       ? `${task.params?.count || 1} image frame(s)`
                       : `${task.params?.samples?.toLocaleString()} samples`}
                   </td>
-                  <td className="py-2.5 px-4 font-mono text-[11px] text-gray-300">
-                    {task.assignedWorkerId || '—'}
+                  <td className="py-2.5 px-4">
+                    <div className="font-medium text-white text-[12px] flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                      <span>
+                        {task.assignedWorkerName ||
+                          (typeof task.assignedTo === 'object' && task.assignedTo?.name) ||
+                          (task.assignedWorkerId ? `node-${task.assignedWorkerId.slice(0, 6)}` : '—')}
+                      </span>
+                    </div>
                   </td>
                   <td className="py-2.5 px-4 font-mono text-gray-400">
                     {task.attempt} / {task.maxAttempts}

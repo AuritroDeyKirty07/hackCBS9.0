@@ -62,15 +62,16 @@ export function setupWorkerNamespace(io) {
 
         const workerName = name || `worker-${workerId.slice(0, 4)}`;
 
-        // Remove any old duplicate records for this worker name
+        // Remove any offline/stale duplicate records for this worker name
         await Worker.deleteMany({
           name: workerName,
           workerId: { $ne: workerId },
+          status: WORKER_STATUS.OFFLINE,
         });
 
-        // Upsert worker record in DB by unique name
+        // Upsert worker record in DB by workerId so machine name changes update in-place
         const worker = await Worker.findOneAndUpdate(
-          { name: workerName },
+          { workerId },
           {
             workerId,
             owner: socket.userId || null,
@@ -163,6 +164,8 @@ export function setupWorkerNamespace(io) {
             index: task.index,
             status: task.status,
             workerId: task.assignedWorkerId,
+            workerName: task.assignedWorkerName,
+            assignedWorkerName: task.assignedWorkerName,
             attempt: task.attempt,
           });
         }
@@ -268,6 +271,8 @@ export function setupWorkerNamespace(io) {
           index: task.index,
           status: task.status,
           workerId: task.assignedWorkerId,
+          workerName: task.assignedWorkerName,
+          assignedWorkerName: task.assignedWorkerName,
           attempt: task.attempt,
           result: task.result,
         });

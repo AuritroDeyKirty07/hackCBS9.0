@@ -16,12 +16,14 @@ router.get('/', async (req, res, next) => {
       .sort({ status: 1, updatedAt: -1 });
 
     const seenNames = new Set();
+    const seenIds = new Set();
     const workers = [];
     const staleIds = [];
 
     for (const w of rawWorkers) {
-      if (!seenNames.has(w.name)) {
+      if (!seenNames.has(w.name) && !seenIds.has(w.workerId)) {
         seenNames.add(w.name);
+        seenIds.add(w.workerId);
         workers.push(w);
       } else {
         // Collect duplicate records to delete
@@ -35,6 +37,37 @@ router.get('/', async (req, res, next) => {
     }
 
     res.json({ workers });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * DELETE /api/workers/cleanup/offline
+ * Purges all offline or stale workers from the cluster registry
+ */
+router.delete('/cleanup/offline', async (req, res, next) => {
+  try {
+    const result = await Worker.deleteMany({ status: 'offline' });
+    res.json({ ok: true, deletedCount: result.deletedCount });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * DELETE /api/workers/:workerId
+ * Deletes a specific worker node
+ */
+router.delete('/:workerId', async (req, res, next) => {
+  try {
+    const result = await Worker.deleteOne({
+      $or: [{ workerId: req.params.workerId }, { _id: req.params.workerId }],
+    });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Worker node not found' });
+    }
+    res.json({ ok: true, message: 'Worker removed from cluster registry' });
   } catch (err) {
     next(err);
   }

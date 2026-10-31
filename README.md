@@ -58,7 +58,7 @@ npm run demo
 
 This starts:
 - The Backend Coordinator on `http://localhost:4000`
-- 3 distributed Worker Agents (`worker-alpha`, `worker-beta`, `worker-gamma`)
+- 1 local Worker Agent (`worker-alpha`) (connect external laptops seamlessly to form the cluster)
 - Seeds the demo user (`demo@meshcompute.ai` / `password123`) and sample job history
 - The React Dashboard on `http://localhost:5173`
 

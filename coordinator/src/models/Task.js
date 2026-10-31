@@ -39,6 +39,10 @@ const taskSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    assignedWorkerName: {
+      type: String,
+      default: null,
+    },
     attempt: {
       type: Number,
       default: 1,

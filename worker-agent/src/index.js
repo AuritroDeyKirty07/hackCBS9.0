@@ -20,22 +20,30 @@ const WORKER_TOKEN = process.env.WORKER_TOKEN || 'meshcompute-dev-token';
 const WORKER_NAME = process.env.WORKER_NAME || `worker-${Math.floor(Math.random() * 900 + 100)}`;
 const MAX_CONCURRENT_TASKS = parseInt(process.env.MAX_CONCURRENT_TASKS || '4', 10);
 
-// Deterministic workerId based on WORKER_NAME (survives restarts in any directory)
+// Deterministic workerId based on machine identity (survives restarts and name changes)
+const machineIdPath = path.resolve(os.homedir(), '.meshcompute-machine.id');
 const sanitizedName = WORKER_NAME.replace(/[^a-zA-Z0-9_-]/g, '_');
-const idFilePath = path.resolve(os.homedir(), `.meshcompute-worker-${sanitizedName}.id`);
-let workerId;
-
-try {
-  if (fs.existsSync(idFilePath)) {
-    workerId = fs.readFileSync(idFilePath, 'utf8').trim();
-  }
-} catch (e) {}
+const legacyIdFilePath = path.resolve(os.homedir(), `.meshcompute-worker-${sanitizedName}.id`);
+let workerId = process.env.WORKER_ID || null;
 
 if (!workerId) {
-  const hash = crypto.createHash('sha256').update(`meshcompute-${WORKER_NAME}-${os.hostname()}`).digest('hex');
+  try {
+    if (fs.existsSync(machineIdPath)) {
+      workerId = fs.readFileSync(machineIdPath, 'utf8').trim();
+    } else if (fs.existsSync(legacyIdFilePath)) {
+      workerId = fs.readFileSync(legacyIdFilePath, 'utf8').trim();
+      try {
+        fs.writeFileSync(machineIdPath, workerId, 'utf8');
+      } catch (e) {}
+    }
+  } catch (e) {}
+}
+
+if (!workerId) {
+  const hash = crypto.createHash('sha256').update(`meshcompute-${os.hostname()}-${os.platform()}-${os.arch()}`).digest('hex');
   workerId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
   try {
-    fs.writeFileSync(idFilePath, workerId, 'utf8');
+    fs.writeFileSync(machineIdPath, workerId, 'utf8');
   } catch (e) {}
 }
 

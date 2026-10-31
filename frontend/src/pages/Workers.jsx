@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useWorkerStore } from '../store/useWorkerStore.js';
 import { useAuthStore } from '../store/useAuthStore.js';
-import { Server, Copy, Check, Terminal, Cpu, HardDrive } from 'lucide-react';
+import { Server, Copy, Check, Terminal, Cpu, HardDrive, Trash2 } from 'lucide-react';
 
 export default function Workers() {
-  const { workers, fetchWorkers } = useWorkerStore();
+  const { workers, fetchWorkers, deleteWorker, cleanupOfflineWorkers } = useWorkerStore();
   const { user } = useAuthStore();
   const [copied, setCopied] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
 
   useEffect(() => {
     fetchWorkers();
@@ -21,6 +22,23 @@ export default function Workers() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const handleCleanOffline = async () => {
+    setCleaning(true);
+    try {
+      await cleanupOfflineWorkers();
+      await fetchWorkers();
+    } finally {
+      setCleaning(false);
+    }
+  };
+
+  const handleDeleteOne = async (workerId) => {
+    await deleteWorker(workerId);
+    await fetchWorkers();
+  };
+
+  const hasOffline = workers.some((w) => w.status !== 'online');
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -77,6 +95,18 @@ export default function Workers() {
               Registered Cluster Nodes ({workers.length})
             </h2>
           </div>
+
+          {hasOffline && (
+            <button
+              onClick={handleCleanOffline}
+              disabled={cleaning}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 disabled:opacity-50 text-red-400 hover:text-red-300 text-xs font-medium border border-red-500/20 transition-colors"
+              title="Remove all disconnected or stale nodes from the cluster registry"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{cleaning ? 'Cleaning...' : 'Clean Offline Nodes'}</span>
+            </button>
+          )}
         </div>
 
         <div className="overflow-x-auto">
@@ -91,12 +121,13 @@ export default function Workers() {
                 <th className="py-3 px-4">In-Flight Tasks</th>
                 <th className="py-3 px-4">Total Done</th>
                 <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800/60">
               {workers.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-gray-500 italic">
+                  <td colSpan="9" className="py-12 text-center text-gray-500 italic">
                     No worker nodes currently registered.
                   </td>
                 </tr>
@@ -154,6 +185,20 @@ export default function Workers() {
                           />
                           {worker.status}
                         </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {!isOnline ? (
+                          <button
+                            onClick={() => handleDeleteOne(worker.workerId)}
+                            title="Remove stale offline node"
+                            className="p-1 px-2.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors border border-red-500/20 inline-flex items-center gap-1 text-[11px]"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Remove</span>
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-gray-600 font-mono">—</span>
+                        )}
                       </td>
                     </tr>
                   );
