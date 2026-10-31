@@ -172,11 +172,24 @@ router.post('/:id/cancel', async (req, res, next) => {
     job.timing.finishedAt = new Date();
     await job.save();
 
-    // Cancel pending/assigned tasks
+    // Cancel pending/assigned tasks and reset workers
+    const activeTasks = await Task.find({
+      job: job._id,
+      status: { $in: ['pending', 'assigned', 'running'] },
+    });
+
     await Task.updateMany(
       { job: job._id, status: { $in: ['pending', 'assigned', 'running'] } },
       { status: 'failed' }
     );
+
+    const assignedWorkerIds = [...new Set(activeTasks.map((t) => t.assignedWorkerId).filter(Boolean))];
+    if (assignedWorkerIds.length > 0) {
+      await Worker.updateMany(
+        { workerId: { $in: assignedWorkerIds } },
+        { activeTasks: 0 }
+      );
+    }
 
     const io = req.app.get('io');
     if (io) {
@@ -184,6 +197,15 @@ router.post('/:id/cancel', async (req, res, next) => {
         jobId: job._id.toString(),
         status: job.status,
       });
+
+      for (const t of activeTasks) {
+        io.of('/dashboard').emit(DASH_EVENTS.TASK_UPDATE, {
+          taskId: t._id.toString(),
+          jobId: job._id.toString(),
+          index: t.index,
+          status: 'failed',
+        });
+      }
     }
 
     res.json({ job, message: 'Job cancelled successfully' });

@@ -141,6 +141,18 @@ export function startHeartbeatMonitor(io, config) {
             at: new Date(),
           });
           await task.save();
+
+          await Job.findByIdAndUpdate(task.job, {
+            status: JOB_STATUS.FAILED,
+            'result.error': `Task #${task.index} timed out after ${task.attempt} attempts`,
+            'timing.finishedAt': new Date(),
+          });
+
+          io.of('/dashboard').emit(DASH_EVENTS.JOB_UPDATE, {
+            jobId: task.job.toString(),
+            status: JOB_STATUS.FAILED,
+            error: `Task #${task.index} timed out`,
+          });
         } else {
           task.history.push({
             workerId: task.assignedWorkerId,
@@ -152,7 +164,20 @@ export function startHeartbeatMonitor(io, config) {
           task.attempt += 1;
           task.assignedTo = null;
           task.assignedWorkerId = null;
+          task.assignedWorkerName = null;
+          task.assignedAt = null;
           await task.save();
+
+          io.of('/dashboard').emit(DASH_EVENTS.TASK_UPDATE, {
+            taskId: task._id.toString(),
+            jobId: task.job.toString(),
+            index: task.index,
+            status: task.status,
+            workerId: null,
+            workerName: null,
+            attempt: task.attempt,
+          });
+
           runScheduler(io);
         }
       }

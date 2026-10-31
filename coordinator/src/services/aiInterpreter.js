@@ -50,7 +50,11 @@ export function regexFallbackParser(prompt) {
     if (lower.includes('sepia')) filterType = 'SEPIA';
     else if (lower.includes('gray') || lower.includes('grey') || lower.includes('bw')) filterType = 'GRAYSCALE';
 
-    const chunkSize = Math.max(1, Math.min(4, Math.ceil(totalImages / 8)));
+    let chunkSize = Math.max(1, Math.min(4, Math.ceil(totalImages / 8)));
+    const chunkMatch = lower.match(/chunk[s]?\s*(?:of)?\s*(\d+)/i);
+    if (chunkMatch) {
+      chunkSize = Math.max(1, Math.min(20, parseInt(chunkMatch[1], 10)));
+    }
 
     return {
       type: TASK_TYPES.IMAGE_BATCH_PROCESS,

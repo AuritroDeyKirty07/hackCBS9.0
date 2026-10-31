@@ -30,16 +30,23 @@ export async function runBaseline(jobId) {
     const width = parseInt(job.params?.width, 10) || 240;
     const height = parseInt(job.params?.height, 10) || 180;
 
-    // Run all images sequentially on single core
+    // For larger workloads, benchmark a representative sample on single core to avoid event-loop blocking
+    const sampleCount = Math.min(totalImages, 20);
+    const sampleStart = Date.now();
+
     runImageBatchProcess({
       startIndex: 0,
-      count: totalImages,
+      count: sampleCount,
       filterType,
       width,
       height,
     });
 
-    const durationMs = Date.now() - startTime;
+    const sampleElapsedMs = Date.now() - sampleStart;
+    const durationMs = sampleCount === totalImages
+      ? sampleElapsedMs
+      : Math.round((sampleElapsedMs / sampleCount) * totalImages);
+
     job.baseline = {
       durationMs,
       processedCount: totalImages,
@@ -50,19 +57,24 @@ export async function runBaseline(jobId) {
   } else {
     // MONTE_CARLO_PI
     const totalSamples = job.params?.totalSamples || 100_000_000;
+    const sampleSize = Math.min(totalSamples, 20_000_000);
     const rng = mulberry32(123456789);
     let inside = 0;
 
-    for (let i = 0; i < totalSamples; i++) {
+    const sampleStart = Date.now();
+    for (let i = 0; i < sampleSize; i++) {
       const x = rng();
       const y = rng();
       if (x * x + y * y <= 1) {
         inside++;
       }
     }
+    const sampleElapsedMs = Date.now() - sampleStart;
+    const durationMs = sampleSize === totalSamples
+      ? sampleElapsedMs
+      : Math.round((sampleElapsedMs / sampleSize) * totalSamples);
 
-    const durationMs = Date.now() - startTime;
-    const piEstimate = (4 * inside) / totalSamples;
+    const piEstimate = (4 * inside) / sampleSize;
 
     job.baseline = {
       durationMs,

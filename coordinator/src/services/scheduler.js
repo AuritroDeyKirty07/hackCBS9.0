@@ -10,6 +10,7 @@ import {
 } from 'meshcompute-shared/constants.js';
 
 let isScheduling = false;
+let schedulePending = false;
 
 /**
  * Pluggable Scheduler Strategy Interface
@@ -37,8 +38,12 @@ const currentStrategy = new RuleBasedSchedulerStrategy();
  * @param {Object} io - Socket.io instance
  */
 export async function runScheduler(io) {
-  if (isScheduling) return;
+  if (isScheduling) {
+    schedulePending = true;
+    return;
+  }
   isScheduling = true;
+  schedulePending = false;
 
   try {
     // 1. Find jobs that are running or pending
@@ -100,6 +105,10 @@ export async function runScheduler(io) {
       const socket = workerSockets.get(selectedWorker.doc.socketId);
       if (!socket) {
         selectedWorker.freeSlots = 0;
+        Worker.updateOne(
+          { _id: selectedWorker.doc._id },
+          { status: WORKER_STATUS.OFFLINE, socketId: null }
+        ).catch(() => {});
         continue;
       }
 
@@ -165,5 +174,9 @@ export async function runScheduler(io) {
     console.error('[Scheduler] Error during scheduling run:', err);
   } finally {
     isScheduling = false;
+    if (schedulePending) {
+      schedulePending = false;
+      setTimeout(() => runScheduler(io), 50);
+    }
   }
 }

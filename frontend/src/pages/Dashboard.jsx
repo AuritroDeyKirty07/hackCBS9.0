@@ -31,8 +31,8 @@ export default function Dashboard() {
   }, []);
 
   const onlineWorkers = workers.filter((w) => w.status === 'online');
-  const totalCores = workers.reduce((acc, w) => acc + (w.cpuCores || 0), 0);
-  const totalActiveTasks = workers.reduce((acc, w) => acc + (w.activeTasks || 0), 0);
+  const totalCores = onlineWorkers.reduce((acc, w) => acc + (w.cpuCores || 0), 0);
+  const totalActiveTasks = onlineWorkers.reduce((acc, w) => acc + (w.activeTasks || 0), 0);
   const completedJobsCount = jobs.filter((j) => j.status === 'completed').length;
 
   return (
@@ -228,11 +228,11 @@ export default function Dashboard() {
             <thead className="bg-gray-950/60 text-gray-400 border-b border-gray-800 uppercase text-[10px] tracking-wider">
               <tr>
                 <th className="py-3 px-4">Job ID</th>
-                <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Samples</th>
+                <th className="py-3 px-4">Workload</th>
+                <th className="py-3 px-4">Workload Size</th>
                 <th className="py-3 px-4">Tasks</th>
                 <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Result (π)</th>
+                <th className="py-3 px-4">Result</th>
                 <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
@@ -242,11 +242,19 @@ export default function Dashboard() {
                   <td className="py-3 px-4 font-mono text-gray-300">
                     {job._id.slice(0, 8)}...
                   </td>
-                  <td className="py-3 px-4 font-medium text-white">{job.type}</td>
-                  <td className="py-3 px-4 text-gray-300 font-mono">
-                    {job.params?.totalSamples?.toLocaleString()}
+                  <td className="py-3 px-4 font-medium text-white">
+                    {job.type === 'IMAGE_BATCH_PROCESS' ? (
+                      <span className="text-blue-400">Image Batch</span>
+                    ) : (
+                      <span className="text-purple-400">Monte Carlo Pi</span>
+                    )}
                   </td>
-                  <td className="py-3 px-4 text-gray-400">
+                  <td className="py-3 px-4 text-gray-300 font-mono">
+                    {job.type === 'IMAGE_BATCH_PROCESS'
+                      ? `${job.params?.totalImages || job.result?.processedImagesCount || 0} images`
+                      : `${job.params?.totalSamples?.toLocaleString() || 0} samples`}
+                  </td>
+                  <td className="py-3 px-4 text-gray-400 font-mono">
                     {job.completedTasks || 0} / {job.totalTasks || 0}
                   </td>
                   <td className="py-3 px-4">
@@ -265,7 +273,11 @@ export default function Dashboard() {
                     </span>
                   </td>
                   <td className="py-3 px-4 font-mono text-emerald-400">
-                    {job.result?.piEstimate ? job.result.piEstimate.toFixed(6) : '—'}
+                    {job.type === 'IMAGE_BATCH_PROCESS'
+                      ? `${job.result?.processedImagesCount || job.params?.totalImages || 0} frames`
+                      : job.result?.piEstimate
+                      ? `π ≈ ${job.result.piEstimate.toFixed(5)}`
+                      : '—'}
                   </td>
                   <td className="py-3 px-4 text-right">
                     <Link

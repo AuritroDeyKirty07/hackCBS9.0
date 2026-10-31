@@ -188,6 +188,12 @@ export function setupWorkerNamespace(io) {
         // DUPLICATE / LATE RESULT PROTECTION
         if (task.status === TASK_STATUS.COMPLETED) {
           console.log(`[WorkerNamespace] Task #${task.index} is already completed. Discarding duplicate result.`);
+          if (task.assignedWorkerId || currentWorkerId) {
+            Worker.updateOne(
+              { workerId: currentWorkerId || task.assignedWorkerId },
+              { $inc: { activeTasks: -1 } }
+            ).catch(() => {});
+          }
           return;
         }
 
@@ -195,6 +201,12 @@ export function setupWorkerNamespace(io) {
           console.log(
             `[WorkerNamespace] Discarding stale attempt result for task #${task.index} (received attempt ${attempt}, current is ${task.attempt})`
           );
+          if (task.assignedWorkerId || currentWorkerId) {
+            Worker.updateOne(
+              { workerId: currentWorkerId || task.assignedWorkerId },
+              { $inc: { activeTasks: -1 } }
+            ).catch(() => {});
+          }
           return;
         }
 
@@ -343,9 +355,11 @@ export function setupWorkerNamespace(io) {
       console.log(`[WorkerNamespace] Socket disconnected (${socket.id}): ${reason}`);
       if (currentWorkerId) {
         const worker = await Worker.findOne({ workerId: currentWorkerId });
-        if (worker) {
+        // Only mark offline if this disconnected socket is still the active socket (prevents race condition on fast reconnect)
+        if (worker && (!worker.socketId || worker.socketId === socket.id)) {
           worker.status = WORKER_STATUS.OFFLINE;
           worker.socketId = null;
+          worker.activeTasks = 0;
           await worker.save();
 
           io.of('/dashboard').emit(DASH_EVENTS.WORKER_UPDATE, {

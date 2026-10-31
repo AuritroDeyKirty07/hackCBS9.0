@@ -35,16 +35,18 @@ export default function App() {
     socket.on(DASH_EVENTS.WORKER_UPDATE, (worker) => {
       handleWorkerUpdate(worker);
       if (worker.status === 'offline') {
-        addActivity(`Worker ${worker.workerId.slice(0, 8)} went offline`, 'warning');
-      } else if (worker.status === 'online' && worker.name) {
-        addActivity(`Worker ${worker.name} heartbeat active`, 'info');
+        addActivity(`Worker ${worker.name || worker.workerId?.slice(0, 8)} went offline`, 'warning');
       }
     });
 
     socket.on(DASH_EVENTS.JOB_UPDATE, (job) => {
       handleJobUpdate(job);
       if (job.status === 'completed') {
-        addActivity(`Job ${job.jobId?.slice(0, 8)} completed with π = ${job.partialPi?.toFixed(6)}`, 'success');
+        if (job.partialPi != null) {
+          addActivity(`Job ${job.jobId?.slice(0, 8)} completed with π = ${job.partialPi.toFixed(6)}`, 'success');
+        } else {
+          addActivity(`Job ${job.jobId?.slice(0, 8)} completed successfully`, 'success');
+        }
       } else if (job.status === 'running') {
         addActivity(`Job ${job.jobId?.slice(0, 8)} dispatched across workers`, 'info');
       }
@@ -53,7 +55,8 @@ export default function App() {
     socket.on(DASH_EVENTS.TASK_UPDATE, (task) => {
       handleTaskUpdate(task);
       if (task.status === 'completed') {
-        addActivity(`Task #${task.index} completed by worker ${task.workerId?.slice(0, 8) || 'node'}`, 'success');
+        const workerDisplayName = task.workerName || (task.workerId ? task.workerId.slice(0, 8) : 'node');
+        addActivity(`Task #${task.index} completed by ${workerDisplayName}`, 'success');
       } else if (task.status === 'pending' && task.attempt > 1) {
         addActivity(`Task #${task.index} requeued for retry (attempt ${task.attempt})`, 'warning');
       }

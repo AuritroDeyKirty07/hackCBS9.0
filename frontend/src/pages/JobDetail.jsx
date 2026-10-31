@@ -77,13 +77,14 @@ export default function JobDetail() {
   let speedup = null;
 
   if (currentJob.baseline?.durationMs && currentJob.timing?.durationMs) {
-    const singleSec = (currentJob.baseline.durationMs / 1000).toFixed(2);
-    const distSec = (currentJob.timing.durationMs / 1000).toFixed(2);
+    const singleSec = Math.max(0.01, currentJob.baseline.durationMs / 1000).toFixed(2);
+    const distSec = Math.max(0.01, currentJob.timing.durationMs / 1000).toFixed(2);
     chartData.push(
       { name: 'Single Machine', time: parseFloat(singleSec) },
       { name: 'Distributed Mesh', time: parseFloat(distSec) }
     );
-    speedup = (currentJob.baseline.durationMs / currentJob.timing.durationMs).toFixed(1);
+    const ratio = currentJob.baseline.durationMs / Math.max(1, currentJob.timing.durationMs);
+    speedup = ratio > 0 ? ratio.toFixed(1) : '1.0';
   }
 
   return (

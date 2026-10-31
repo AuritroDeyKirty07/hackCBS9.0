@@ -98,20 +98,48 @@ export default function NewJob() {
     {
       label: '🖼️ 24 Images (Edge Sobel)',
       prompt: 'Batch process 24 images with Sobel edge detection in chunks of 2',
+      type: 'IMAGE_BATCH_PROCESS',
+      params: { totalImages: 24, chunkSize: 2, filterType: 'EDGE_SOBEL' },
+      explanation: 'Parallel image processing & edge convolution of 24 frames distributed across workers',
     },
     {
       label: '🖼️ 36 Images (Sepia Filter)',
-      prompt: 'Parallel render and apply sepia filter to 36 images',
+      prompt: 'Parallel render and apply sepia filter to 36 images in chunks of 3',
+      type: 'IMAGE_BATCH_PROCESS',
+      params: { totalImages: 36, chunkSize: 3, filterType: 'SEPIA' },
+      explanation: 'Distributed sepia tone transformation on 36 procedural image frames in chunks of 3',
     },
     {
       label: '⚡ Heavy 96 Images Batch',
       prompt: 'Heavy workload: Process 96 images with edge filters in chunks of 4',
+      type: 'IMAGE_BATCH_PROCESS',
+      params: { totalImages: 96, chunkSize: 4, filterType: 'EDGE_SOBEL' },
+      explanation: 'High-intensity Julia set raymarching & multi-pass convolution on 96 frames in chunks of 4',
     },
     {
       label: '🔢 Monte Carlo Pi (200M)',
       prompt: 'Estimate pi using 200 million samples split into chunks of 5 million',
+      type: 'MONTE_CARLO_PI',
+      params: { totalSamples: 200_000_000, chunkSize: 5_000_000 },
+      explanation: 'Monte Carlo Pi estimation: 200M random trials distributed in 40 chunks of 5M',
     },
   ];
+
+  const handleSelectTemplate = (p) => {
+    setPrompt(p.prompt);
+    setJobType(p.type);
+    if (p.type === 'IMAGE_BATCH_PROCESS') {
+      setTotalImages(p.params.totalImages);
+      setImageChunkSize(p.params.chunkSize);
+      setFilterType(p.params.filterType);
+    } else {
+      setTotalSamples(p.params.totalSamples);
+      setSampleChunkSize(p.params.chunkSize);
+    }
+    setExplanation(p.explanation);
+    setHasInterpreted(true);
+    setIsFallback(false);
+  };
 
   const calculatedTasks =
     jobType === 'IMAGE_BATCH_PROCESS'
@@ -155,7 +183,7 @@ export default function NewJob() {
             <button
               key={idx}
               type="button"
-              onClick={() => setPrompt(p.prompt)}
+              onClick={() => handleSelectTemplate(p)}
               className="text-xs px-2.5 py-1 rounded-lg bg-gray-800/80 hover:bg-gray-800 text-gray-300 hover:text-white border border-gray-700/60 transition-colors"
             >
               {p.label}

@@ -25,11 +25,11 @@ export default function History() {
             <tr>
               <th className="py-3.5 px-4">Job ID</th>
               <th className="py-3.5 px-4">Workload</th>
-              <th className="py-3.5 px-4">Samples</th>
+              <th className="py-3.5 px-4">Compute Size</th>
               <th className="py-3.5 px-4">Tasks</th>
               <th className="py-3.5 px-4">Status</th>
               <th className="py-3.5 px-4">Duration</th>
-              <th className="py-3.5 px-4">Result (π)</th>
+              <th className="py-3.5 px-4">Result Summary</th>
               <th className="py-3.5 px-4">Date</th>
               <th className="py-3.5 px-4 text-right">Details</th>
             </tr>
@@ -53,11 +53,19 @@ export default function History() {
                     <td className="py-3 px-4 font-mono text-gray-300">
                       {job._id.slice(0, 8)}...
                     </td>
-                    <td className="py-3 px-4 font-medium text-white">{job.type}</td>
-                    <td className="py-3 px-4 text-gray-300 font-mono">
-                      {job.params?.totalSamples?.toLocaleString()}
+                    <td className="py-3 px-4 font-medium text-white">
+                      {job.type === 'IMAGE_BATCH_PROCESS' ? (
+                        <span className="text-blue-400">Image Batch Processing</span>
+                      ) : (
+                        <span className="text-purple-400">Monte Carlo Pi</span>
+                      )}
                     </td>
-                    <td className="py-3 px-4 text-gray-400">
+                    <td className="py-3 px-4 text-gray-300 font-mono">
+                      {job.type === 'IMAGE_BATCH_PROCESS'
+                        ? `${job.params?.totalImages || job.result?.processedImagesCount || 0} images`
+                        : `${job.params?.totalSamples?.toLocaleString() || 0} samples`}
+                    </td>
+                    <td className="py-3 px-4 text-gray-400 font-mono">
                       {job.completedTasks || 0} / {job.totalTasks || 0}
                     </td>
                     <td className="py-3 px-4">
@@ -77,7 +85,11 @@ export default function History() {
                     </td>
                     <td className="py-3 px-4 font-mono text-gray-300">{duration}</td>
                     <td className="py-3 px-4 font-mono text-emerald-400">
-                      {job.result?.piEstimate ? job.result.piEstimate.toFixed(7) : '—'}
+                      {job.type === 'IMAGE_BATCH_PROCESS'
+                        ? `${job.result?.processedImagesCount || job.params?.totalImages || 0} frames rendered`
+                        : job.result?.piEstimate
+                        ? `π ≈ ${job.result.piEstimate.toFixed(6)}`
+                        : '—'}
                     </td>
                     <td className="py-3 px-4 text-gray-500 text-[11px]">{date}</td>
                     <td className="py-3 px-4 text-right">

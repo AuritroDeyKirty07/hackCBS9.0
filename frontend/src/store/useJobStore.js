@@ -64,6 +64,11 @@ export const useJobStore = create((set, get) => ({
         nextCurrent = {
           ...nextCurrent,
           ...updatedJob,
+          timing: {
+            ...(nextCurrent.timing || {}),
+            ...(updatedJob.timing || {}),
+            ...(updatedJob.durationMs ? { durationMs: updatedJob.durationMs } : {}),
+          },
           result: {
             ...nextCurrent.result,
             ...(updatedJob.result || {}),
