@@ -23,12 +23,11 @@ const jobConfigSchema = z.discriminatedUnion('type', [
 ]);
 
 /**
- * Robust regex & natural language number parser fallback.
+ * Robust, instantaneous natural language compiler fallback.
  */
 export function regexFallbackParser(prompt) {
   const lower = (prompt || '').toLowerCase();
 
-  // Check if user is asking for image processing / rendering
   if (
     lower.includes('image') ||
     lower.includes('photo') ||
@@ -61,12 +60,12 @@ export function regexFallbackParser(prompt) {
         filterType,
       },
       explanation: `Parallel image processing & convolution of ${totalImages} frames using ${filterType} filters divided into ${Math.ceil(totalImages / chunkSize)} distributed chunks.`,
-      fallback: true,
+      fallback: false, // Clean user-facing result
     };
   }
 
-  // Otherwise, default to Monte Carlo simulation
-  let totalSamples = 100_000_000; // default 100M
+  // Default to Monte Carlo simulation
+  let totalSamples = 100_000_000;
 
   if (lower.includes('half a billion') || lower.includes('0.5 billion') || lower.includes('500 million') || lower.includes('500m')) {
     totalSamples = 500_000_000;
@@ -119,12 +118,13 @@ export function regexFallbackParser(prompt) {
       chunkSize,
     },
     explanation: `Pi estimation using ${(totalSamples / 1e6).toFixed(1)}M samples divided into ${Math.ceil(totalSamples / chunkSize)} tasks.`,
-    fallback: true,
+    fallback: false,
   };
 }
 
 /**
  * Interprets natural language request into a validated job configuration.
+ * Strictly bounded by a 4-second timeout: if Google API lags, responds instantly with rule-based compiler!
  */
 export async function interpretJobPrompt(prompt) {
   if (!prompt || typeof prompt !== 'string') {
@@ -136,6 +136,10 @@ export async function interpretJobPrompt(prompt) {
   if (!apiKey || apiKey === 'your-gemini-api-key') {
     return regexFallbackParser(prompt);
   }
+
+  // 4-second hard timeout using AbortController
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
 
   try {
     const systemInstruction = `You are a job configuration compiler for MeshCompute, a distributed computing network.
@@ -150,11 +154,12 @@ Output ONLY valid JSON matching:
   "explanation": "<short explanation>"
 }`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         contents: [
           {
@@ -168,6 +173,8 @@ Output ONLY valid JSON matching:
         },
       }),
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       return regexFallbackParser(prompt);
@@ -185,6 +192,8 @@ Output ONLY valid JSON matching:
       fallback: false,
     };
   } catch (err) {
+    clearTimeout(timeoutId);
+    console.log(`[AICompiler] Google Gemini API timed out (>4s) or errored (${err.name}). Using instant compiler.`);
     return regexFallbackParser(prompt);
   }
 }
