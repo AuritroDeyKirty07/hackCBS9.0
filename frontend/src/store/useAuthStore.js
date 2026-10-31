@@ -42,3 +42,4 @@ export const useAuthStore = create((set, get) => ({
     set({ user: null, token: null });
   },
 }));
+

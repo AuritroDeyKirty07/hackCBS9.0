@@ -1,6 +1,7 @@
 // === Task Types (whitelist) ===
 export const TASK_TYPES = {
   MONTE_CARLO_PI: 'MONTE_CARLO_PI',
+  IMAGE_BATCH_PROCESS: 'IMAGE_BATCH_PROCESS',
 };
 
 // === Statuses ===
@@ -49,7 +50,7 @@ export const DASH_EVENTS = {
 export const LIMITS = {
   MAX_SAMPLES_PER_JOB:  2_000_000_000,
   MAX_CHUNK_SIZE:        50_000_000,
-  MIN_CHUNK_SIZE:        10_000,
+  MIN_CHUNK_SIZE:        1,
   DEFAULT_CHUNK_SIZE:    5_000_000,
   MAX_ATTEMPTS:          3,
   HEARTBEAT_INTERVAL_MS: 3000,

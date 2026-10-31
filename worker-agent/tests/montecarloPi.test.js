@@ -27,3 +27,4 @@ describe('Monte Carlo Pi Task Execution', () => {
     expect(Math.abs(pi - Math.PI)).toBeLessThan(0.015);
   });
 });
+

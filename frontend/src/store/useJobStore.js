@@ -95,3 +95,4 @@ export const useJobStore = create((set, get) => ({
     });
   },
 }));
+

@@ -188,18 +188,28 @@ export function setupWorkerNamespace(io) {
         }
 
         // VALIDATION
-        const { inside, total, computeMs } = result || {};
-        if (
-          typeof inside !== 'number' ||
-          typeof total !== 'number' ||
-          inside < 0 ||
-          inside > total ||
-          total !== task.params.samples
-        ) {
-          console.error(
-            `[WorkerNamespace] Invalid result received for task ${taskId}: inside=${inside}, total=${total}, expected=${task.params.samples}`
-          );
-          // Treat as task error
+        const computeMs = result?.computeMs || 0;
+        let isValid = true;
+
+        if (task.type === 'MONTE_CARLO_PI') {
+          const { inside, total } = result || {};
+          if (
+            typeof inside !== 'number' ||
+            typeof total !== 'number' ||
+            inside < 0 ||
+            inside > total ||
+            total !== task.params.samples
+          ) {
+            isValid = false;
+          }
+        } else if (task.type === 'IMAGE_BATCH_PROCESS') {
+          if (!result || !Array.isArray(result.images) || result.processedCount !== task.params.count) {
+            isValid = false;
+          }
+        }
+
+        if (!isValid) {
+          console.error(`[WorkerNamespace] Invalid result received for task ${taskId}`);
           task.status = TASK_STATUS.PENDING;
           task.attempt += 1;
           task.history.push({
@@ -216,7 +226,7 @@ export function setupWorkerNamespace(io) {
         // Mark task completed
         task.status = TASK_STATUS.COMPLETED;
         task.completedAt = new Date();
-        task.result = { inside, total, computeMs: computeMs || 0 };
+        task.result = { ...result, computeMs };
         task.history.push({
           workerId: task.assignedWorkerId,
           attempt,
@@ -334,3 +344,4 @@ export function setupWorkerNamespace(io) {
     });
   });
 }
+

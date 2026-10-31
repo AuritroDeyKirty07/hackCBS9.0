@@ -1,6 +1,6 @@
 import { Job } from '../models/Job.js';
 import { Task } from '../models/Task.js';
-import { JOB_STATUS, TASK_STATUS, DASH_EVENTS } from 'meshcompute-shared/constants.js';
+import { TASK_TYPES, JOB_STATUS, TASK_STATUS, DASH_EVENTS } from 'meshcompute-shared/constants.js';
 
 /**
  * Updates partial and final aggregation for a job when a task finishes.
@@ -18,22 +18,45 @@ export async function updateJobAggregation(jobId, io = null) {
     status: TASK_STATUS.COMPLETED,
   });
 
-  let totalInside = 0;
-  let totalCount = 0;
-
-  for (const t of completedTasks) {
-    if (t.result && typeof t.result.inside === 'number' && typeof t.result.total === 'number') {
-      totalInside += t.result.inside;
-      totalCount += t.result.total;
-    }
-  }
-
   job.completedTasks = completedTasks.length;
-  job.result.insideCount = totalInside;
-  job.result.totalCount = totalCount;
 
-  if (totalCount > 0) {
-    job.result.piEstimate = (4 * totalInside) / totalCount;
+  if (job.type === TASK_TYPES.IMAGE_BATCH_PROCESS) {
+    const allImages = [];
+    let totalPixels = 0;
+    let processedImagesCount = 0;
+
+    for (const t of completedTasks) {
+      if (t.result?.images) {
+        allImages.push(...t.result.images);
+      }
+      totalPixels += t.result?.totalPixels || 0;
+      processedImagesCount += t.result?.processedCount || 0;
+    }
+
+    job.result = {
+      ...(job.result || {}),
+      images: allImages.sort((a, b) => a.imageIndex - b.imageIndex),
+      totalPixels,
+      processedImagesCount,
+    };
+  } else {
+    // MONTE_CARLO_PI
+    let totalInside = 0;
+    let totalCount = 0;
+
+    for (const t of completedTasks) {
+      if (t.result && typeof t.result.inside === 'number' && typeof t.result.total === 'number') {
+        totalInside += t.result.inside;
+        totalCount += t.result.total;
+      }
+    }
+
+    job.result = {
+      ...(job.result || {}),
+      insideCount: totalInside,
+      totalCount: totalCount,
+      piEstimate: totalCount > 0 ? (4 * totalInside) / totalCount : null,
+    };
   }
 
   // Check if job is fully completed
@@ -54,7 +77,7 @@ export async function updateJobAggregation(jobId, io = null) {
       status: job.status,
       completedTasks: job.completedTasks,
       totalTasks: job.totalTasks,
-      partialPi: job.result.piEstimate,
+      partialPi: job.result?.piEstimate,
       durationMs: job.timing.durationMs,
       result: job.result,
     });

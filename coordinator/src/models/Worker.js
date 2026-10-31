@@ -71,3 +71,4 @@ const workerSchema = new mongoose.Schema(
 );
 
 export const Worker = mongoose.model('Worker', workerSchema);
+

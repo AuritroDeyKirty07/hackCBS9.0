@@ -40,22 +40,33 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ error: `Unsupported job type: ${jobType}` });
     }
 
-    let { totalSamples, chunkSize } = params || {};
-    totalSamples = parseInt(totalSamples, 10);
-    chunkSize = parseInt(chunkSize, 10) || LIMITS.DEFAULT_CHUNK_SIZE;
+    let jobParams = params || {};
 
-    if (!totalSamples || totalSamples < 10_000 || totalSamples > LIMITS.MAX_SAMPLES_PER_JOB) {
-      return res.status(400).json({
-        error: `totalSamples must be between 10,000 and ${LIMITS.MAX_SAMPLES_PER_JOB.toLocaleString()}`,
-      });
+    if (jobType === TASK_TYPES.MONTE_CARLO_PI) {
+      let { totalSamples, chunkSize } = params || {};
+      totalSamples = parseInt(totalSamples, 10);
+      chunkSize = parseInt(chunkSize, 10) || LIMITS.DEFAULT_CHUNK_SIZE;
+
+      if (!totalSamples || totalSamples < 10_000 || totalSamples > LIMITS.MAX_SAMPLES_PER_JOB) {
+        return res.status(400).json({
+          error: `totalSamples must be between 10,000 and ${LIMITS.MAX_SAMPLES_PER_JOB.toLocaleString()}`,
+        });
+      }
+
+      chunkSize = Math.min(Math.max(chunkSize, LIMITS.MIN_CHUNK_SIZE), LIMITS.MAX_CHUNK_SIZE);
+      jobParams = { totalSamples, chunkSize };
+    } else if (jobType === TASK_TYPES.IMAGE_BATCH_PROCESS) {
+      let { totalImages, chunkSize, filterType } = params || {};
+      totalImages = Math.min(Math.max(parseInt(totalImages, 10) || 24, 1), 500);
+      chunkSize = Math.min(Math.max(parseInt(chunkSize, 10) || 2, 1), 50);
+      filterType = filterType || 'EDGE_SOBEL';
+      jobParams = { totalImages, chunkSize, filterType };
     }
-
-    chunkSize = Math.min(Math.max(chunkSize, LIMITS.MIN_CHUNK_SIZE), LIMITS.MAX_CHUNK_SIZE);
 
     const job = await Job.create({
       owner: req.user?._id || null,
       type: jobType,
-      params: { totalSamples, chunkSize },
+      params: jobParams,
       rawPrompt: rawPrompt || null,
       aiConfig: aiConfig || null,
       status: JOB_STATUS.PENDING,
@@ -189,3 +200,4 @@ router.post('/:id/baseline', async (req, res, next) => {
 });
 
 export default router;
+

@@ -132,3 +132,4 @@ npm test
 - **Docker Isolation**: For running containerized workloads with hard memory and CPU quotas.
 - **Decentralized P2P Mesh**: Upgrading worker-to-worker transport via WebRTC / libp2p.
 - **Compute Credits & Proof of Compute**: Reward contributors based on verified CPU cycles.
+

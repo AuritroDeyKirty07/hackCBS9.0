@@ -20,8 +20,8 @@ const taskSchema = new mongoose.Schema(
       required: true,
     },
     params: {
-      samples: { type: Number, required: true },
-      seed: { type: Number, required: true },
+      type: mongoose.Schema.Types.Mixed,
+      required: true,
     },
     status: {
       type: String,
@@ -56,9 +56,8 @@ const taskSchema = new mongoose.Schema(
       default: null,
     },
     result: {
-      inside: { type: Number, default: null },
-      total: { type: Number, default: null },
-      computeMs: { type: Number, default: null },
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
     },
     history: [
       {

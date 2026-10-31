@@ -13,20 +13,18 @@ import {
 } from 'recharts';
 import {
   Play,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
   ArrowLeft,
   Gauge,
   Cpu,
   Layers,
   Zap,
+  Image as ImageIcon,
+  Sparkles,
 } from 'lucide-react';
 
 export default function JobDetail() {
   const { id } = useParams();
-  const { currentJob, currentTasks, fetchJobById, handleJobUpdate, handleTaskUpdate } =
-    useJobStore();
+  const { currentJob, currentTasks, fetchJobById, handleJobUpdate } = useJobStore();
   const [runningBaseline, setRunningBaseline] = useState(false);
   const [baselineError, setBaselineError] = useState(null);
 
@@ -60,6 +58,7 @@ export default function JobDetail() {
     );
   }
 
+  const isImageJob = currentJob.type === 'IMAGE_BATCH_PROCESS';
   const isCompleted = currentJob.status === 'completed';
   const progressPct =
     currentJob.totalTasks > 0
@@ -69,6 +68,9 @@ export default function JobDetail() {
   const piEstimate = currentJob.result?.piEstimate;
   const errorMargin =
     piEstimate != null ? Math.abs(piEstimate - Math.PI).toFixed(7) : null;
+
+  const processedImages = currentJob.result?.images || [];
+  const totalPixels = currentJob.result?.totalPixels || 0;
 
   // Chart data for Baseline vs Distributed
   const chartData = [];
@@ -118,30 +120,53 @@ export default function JobDetail() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <Layers className="w-5 h-5 text-blue-400" />
+              {isImageJob ? (
+                <ImageIcon className="w-5 h-5 text-blue-400" />
+              ) : (
+                <Layers className="w-5 h-5 text-purple-400" />
+              )}
               <h1 className="text-xl font-bold text-white tracking-tight">
-                {currentJob.type}
+                {isImageJob ? 'Distributed Image Processing Batch' : currentJob.type}
               </h1>
             </div>
             <p className="text-xs text-gray-400 font-mono mt-1">ID: {currentJob._id}</p>
           </div>
 
           <div className="flex items-center gap-6 text-xs text-gray-400">
-            <div>
-              <span>Total Points:</span>{' '}
-              <strong className="text-white font-mono">
-                {currentJob.params?.totalSamples?.toLocaleString()}
-              </strong>
-            </div>
-            <div>
-              <span>Chunk Size:</span>{' '}
-              <strong className="text-white font-mono">
-                {currentJob.params?.chunkSize?.toLocaleString()}
-              </strong>
-            </div>
+            {isImageJob ? (
+              <>
+                <div>
+                  <span>Total Images:</span>{' '}
+                  <strong className="text-white font-mono">
+                    {currentJob.params?.totalImages || 24}
+                  </strong>
+                </div>
+                <div>
+                  <span>Filter Kernel:</span>{' '}
+                  <strong className="text-blue-400 font-mono">
+                    {currentJob.params?.filterType || 'EDGE_SOBEL'}
+                  </strong>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <span>Total Points:</span>{' '}
+                  <strong className="text-white font-mono">
+                    {currentJob.params?.totalSamples?.toLocaleString()}
+                  </strong>
+                </div>
+                <div>
+                  <span>Chunk Size:</span>{' '}
+                  <strong className="text-white font-mono">
+                    {currentJob.params?.chunkSize?.toLocaleString()}
+                  </strong>
+                </div>
+              </>
+            )}
             <div>
               <span>Duration:</span>{' '}
-              <strong className="text-blue-400 font-mono">
+              <strong className="text-emerald-400 font-mono">
                 {currentJob.timing?.durationMs
                   ? `${(currentJob.timing.durationMs / 1000).toFixed(2)}s`
                   : 'Computing...'}
@@ -173,30 +198,97 @@ export default function JobDetail() {
           </div>
         </div>
 
-        {/* Real-time Math Estimation Result Box */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-          <div className="p-4 rounded-xl bg-gray-950/80 border border-gray-800">
-            <span className="text-xs text-gray-400 block mb-1">Estimated Value of π</span>
-            <span className="text-2xl font-bold font-mono text-emerald-400 tracking-tight">
-              {piEstimate != null ? piEstimate.toFixed(8) : 'Calculating...'}
-            </span>
-          </div>
+        {/* Real-time Result Statistics */}
+        {isImageJob ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            <div className="p-4 rounded-xl bg-gray-950/80 border border-gray-800">
+              <span className="text-xs text-gray-400 block mb-1">Processed Frames</span>
+              <span className="text-2xl font-bold font-mono text-emerald-400 tracking-tight">
+                {processedImages.length} / {currentJob.params?.totalImages || 24}
+              </span>
+            </div>
 
-          <div className="p-4 rounded-xl bg-gray-950/80 border border-gray-800">
-            <span className="text-xs text-gray-400 block mb-1">True Value (Math.PI)</span>
-            <span className="text-2xl font-bold font-mono text-gray-300 tracking-tight">
-              3.14159265
-            </span>
-          </div>
+            <div className="p-4 rounded-xl bg-gray-950/80 border border-gray-800">
+              <span className="text-xs text-gray-400 block mb-1">Total Pixels Computed</span>
+              <span className="text-2xl font-bold font-mono text-blue-400 tracking-tight">
+                {totalPixels > 0 ? totalPixels.toLocaleString() : 'Calculating...'}
+              </span>
+            </div>
 
-          <div className="p-4 rounded-xl bg-gray-950/80 border border-gray-800">
-            <span className="text-xs text-gray-400 block mb-1">Absolute Error Margin</span>
-            <span className="text-2xl font-bold font-mono text-blue-400 tracking-tight">
-              {errorMargin != null ? `±${errorMargin}` : '—'}
-            </span>
+            <div className="p-4 rounded-xl bg-gray-950/80 border border-gray-800">
+              <span className="text-xs text-gray-400 block mb-1">Processing Mode</span>
+              <span className="text-base font-bold font-mono text-purple-400 tracking-tight">
+                Parallel Sobel Convolution
+              </span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            <div className="p-4 rounded-xl bg-gray-950/80 border border-gray-800">
+              <span className="text-xs text-gray-400 block mb-1">Estimated Value of π</span>
+              <span className="text-2xl font-bold font-mono text-emerald-400 tracking-tight">
+                {piEstimate != null ? piEstimate.toFixed(8) : 'Calculating...'}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-xl bg-gray-950/80 border border-gray-800">
+              <span className="text-xs text-gray-400 block mb-1">True Value (Math.PI)</span>
+              <span className="text-2xl font-bold font-mono text-gray-300 tracking-tight">
+                3.14159265
+              </span>
+            </div>
+
+            <div className="p-4 rounded-xl bg-gray-950/80 border border-gray-800">
+              <span className="text-xs text-gray-400 block mb-1">Absolute Error Margin</span>
+              <span className="text-2xl font-bold font-mono text-blue-400 tracking-tight">
+                {errorMargin != null ? `±${errorMargin}` : '—'}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Real-time Rendered Image Gallery (For IMAGE_BATCH_PROCESS) */}
+      {isImageJob && (
+        <div className="p-6 rounded-2xl bg-gray-900/80 border border-gray-800 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-400" />
+              <h2 className="font-bold text-sm text-white">
+                Live Processed Image Gallery ({processedImages.length} frames completed)
+              </h2>
+            </div>
+            <span className="text-xs text-gray-500">Real-time worker renders</span>
+          </div>
+
+          {processedImages.length === 0 ? (
+            <div className="py-12 text-center text-gray-500 italic text-xs">
+              Waiting for workers to stream completed image frames...
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {processedImages.map((img) => (
+                <div
+                  key={img.imageIndex}
+                  className="p-2 rounded-xl bg-gray-950 border border-gray-800/80 space-y-2 hover:border-blue-500/50 transition-colors"
+                >
+                  <div className="aspect-[4/3] rounded-lg overflow-hidden bg-black flex items-center justify-center">
+                    <img
+                      src={img.previewUrl}
+                      alt={`Frame #${img.imageIndex}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+                    <span>Frame #{img.imageIndex + 1}</span>
+                    <span className="text-blue-400 font-semibold">160×120</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Benchmark: Single-Machine Baseline vs Distributed Mesh */}
       <div className="p-6 rounded-2xl bg-gray-900/80 border border-gray-800 shadow-xl space-y-6">
@@ -277,12 +369,12 @@ export default function JobDetail() {
             <thead className="sticky top-0 bg-gray-950 text-gray-400 border-b border-gray-800 uppercase text-[10px] tracking-wider z-10">
               <tr>
                 <th className="py-2.5 px-4">Task #</th>
-                <th className="py-2.5 px-4">Samples</th>
+                <th className="py-2.5 px-4">Workload Sub-Task</th>
                 <th className="py-2.5 px-4">Worker Node</th>
                 <th className="py-2.5 px-4">Attempt</th>
                 <th className="py-2.5 px-4">Status</th>
                 <th className="py-2.5 px-4">Execution Time</th>
-                <th className="py-2.5 px-4 text-right">Inside Count</th>
+                <th className="py-2.5 px-4 text-right">Output</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800/60">
@@ -292,7 +384,9 @@ export default function JobDetail() {
                     #{task.index}
                   </td>
                   <td className="py-2.5 px-4 text-gray-300 font-mono">
-                    {task.params?.samples?.toLocaleString()}
+                    {isImageJob
+                      ? `${task.params?.count || 1} image frame(s)`
+                      : `${task.params?.samples?.toLocaleString()} samples`}
                   </td>
                   <td className="py-2.5 px-4 font-mono text-[11px] text-gray-300">
                     {task.assignedWorkerId || '—'}
@@ -321,7 +415,9 @@ export default function JobDetail() {
                     {task.result?.computeMs != null ? `${task.result.computeMs}ms` : '—'}
                   </td>
                   <td className="py-2.5 px-4 font-mono text-right text-gray-400">
-                    {task.result?.inside != null ? task.result.inside.toLocaleString() : '—'}
+                    {isImageJob
+                      ? `${task.result?.images?.length || 0} frames rendered`
+                      : `${task.result?.inside != null ? task.result.inside.toLocaleString() : '—'}`}
                   </td>
                 </tr>
               ))}

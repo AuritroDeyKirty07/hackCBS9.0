@@ -15,8 +15,8 @@ const jobSchema = new mongoose.Schema(
       required: true,
     },
     params: {
-      totalSamples: { type: Number, required: true },
-      chunkSize: { type: Number, required: true },
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
     },
     rawPrompt: {
       type: String,
@@ -41,10 +41,8 @@ const jobSchema = new mongoose.Schema(
       default: 0,
     },
     result: {
-      piEstimate: { type: Number, default: null },
-      insideCount: { type: Number, default: 0 },
-      totalCount: { type: Number, default: 0 },
-      error: { type: String, default: null },
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
     },
     timing: {
       startedAt: { type: Date, default: null },
@@ -54,6 +52,7 @@ const jobSchema = new mongoose.Schema(
     baseline: {
       durationMs: { type: Number, default: null },
       piEstimate: { type: Number, default: null },
+      processedPerSec: { type: Number, default: null },
     },
   },
   {

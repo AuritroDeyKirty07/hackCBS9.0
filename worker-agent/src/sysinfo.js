@@ -42,3 +42,4 @@ export function getDynamicMetrics() {
     freeRamMB: Math.round(os.freemem() / (1024 * 1024)),
   };
 }
+

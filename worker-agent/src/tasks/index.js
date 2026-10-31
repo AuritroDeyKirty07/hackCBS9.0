@@ -1,15 +1,14 @@
 import { TASK_TYPES } from 'meshcompute-shared/constants.js';
 import { runMonteCarloPi } from './montecarloPi.js';
+import { runImageBatchProcess } from './imageBatchProcess.js';
 
 /**
  * Extensible Task Registry.
- * Drop any pure computational handler function here and map it to its whitelisted task type.
+ * Pure computational handler functions mapped to whitelisted task types.
  */
 export const taskRegistry = new Map([
   [TASK_TYPES.MONTE_CARLO_PI, runMonteCarloPi],
-  // Future extensions:
-  // [TASK_TYPES.IMAGE_RESIZE, runImageResize],
-  // [TASK_TYPES.CSV_PROCESSING, runCsvProcessing],
+  [TASK_TYPES.IMAGE_BATCH_PROCESS, runImageBatchProcess],
 ]);
 
 export function getTaskHandler(type) {

@@ -19,3 +19,4 @@ export const config = {
   maxSamplesPerJob: parseInt(process.env.MAX_SAMPLES_PER_JOB || '2000000000', 10),
   maxAttempts: parseInt(process.env.MAX_ATTEMPTS || '3', 10),
 };
+

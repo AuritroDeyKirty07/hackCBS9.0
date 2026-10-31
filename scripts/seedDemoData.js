@@ -78,3 +78,4 @@ if (process.argv[1]?.endsWith('seedDemoData.js')) {
       process.exit(1);
     });
 }
+

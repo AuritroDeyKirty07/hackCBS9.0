@@ -47,3 +47,4 @@ export function executeTask({ taskId, type, params }) {
     worker.postMessage({ taskId, type, params });
   });
 }
+

@@ -38,3 +38,4 @@ export function runMonteCarloPi({ samples, seed }) {
     total: samples,
   };
 }
+
