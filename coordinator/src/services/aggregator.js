@@ -21,38 +21,26 @@ export async function updateJobAggregation(jobId, io = null) {
   job.completedTasks = completedTasks.length;
 
   if (job.type === TASK_TYPES.MATRIX_MULTIPLY) {
-    const matrixSize = parseInt(job.params?.matrixSize, 10) || 1000;
+    const matrixSize = parseInt(job.params?.matrixSize, 10) || 6;
     let completedRows = 0;
-    let totalFlops = 0;
-    let totalSumOfSquares = 0.0;
-    const previewGrid = Array.from({ length: 5 }, () => Array(5).fill(0));
+    const fullMatrix = Array.from({ length: matrixSize }, () => Array(matrixSize).fill(0));
 
     for (const t of completedTasks) {
       completedRows += t.result?.rowCount || 0;
-      totalFlops += t.result?.flops || 0;
-      totalSumOfSquares += t.result?.sumOfSquares || 0.0;
-
-      if (Array.isArray(t.result?.sampleValues)) {
-        for (const item of t.result.sampleValues) {
-          if (item.row < 5 && item.col < 5) {
-            previewGrid[item.row][item.col] = item.val;
+      if (Array.isArray(t.result?.computedRows)) {
+        for (const item of t.result.computedRows) {
+          if (item.row < matrixSize && Array.isArray(item.values)) {
+            fullMatrix[item.row] = item.values;
           }
         }
       }
     }
 
-    const durationMs = job.timing?.durationMs || (job.timing?.startedAt ? Date.now() - new Date(job.timing.startedAt).getTime() : 1);
-    const gflops = totalFlops > 0 && durationMs > 0 ? parseFloat((totalFlops / (durationMs * 1e6)).toFixed(2)) : 0;
-    const frobeniusNorm = Math.sqrt(Math.max(0, totalSumOfSquares)).toFixed(3);
-
     job.result = {
       ...(job.result || {}),
       matrixSize,
       completedRows,
-      totalFlops,
-      gflops,
-      frobeniusNorm,
-      previewGrid,
+      fullMatrix,
     };
   } else {
     // MONTE_CARLO_PI

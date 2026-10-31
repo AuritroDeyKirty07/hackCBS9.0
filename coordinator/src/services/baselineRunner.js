@@ -25,22 +25,18 @@ export async function runBaseline(jobId) {
   const startTime = Date.now();
 
   if (job.type === TASK_TYPES.MATRIX_MULTIPLY) {
-    const matrixSize = parseInt(job.params?.matrixSize, 10) || 1000;
-    // Benchmark sample of rows on single core to avoid event-loop blocking
-    const sampleRows = Math.min(matrixSize, 40);
+    const matrixSize = parseInt(job.params?.matrixSize, 10) || 6;
     const sampleStart = Date.now();
 
-    runMatrixMultiply({
-      matrixSize,
-      startRow: 0,
-      rowCount: sampleRows,
-    });
+    for (let r = 0; r < matrixSize; r++) {
+      runMatrixMultiply({
+        matrixSize,
+        startRow: r,
+        rowCount: 1,
+      });
+    }
 
-    const sampleElapsedMs = Math.max(1, Date.now() - sampleStart);
-    const durationMs = sampleRows === matrixSize
-      ? sampleElapsedMs
-      : Math.round((sampleElapsedMs / sampleRows) * matrixSize);
-
+    const durationMs = Math.max(1, Date.now() - sampleStart);
     job.baseline = {
       durationMs,
       matrixSize,

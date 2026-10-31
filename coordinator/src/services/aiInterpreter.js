@@ -14,8 +14,8 @@ const jobConfigSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal(TASK_TYPES.MATRIX_MULTIPLY),
     params: z.object({
-      matrixSize: z.number().int().min(100).max(4000),
-      chunkSize: z.number().int().min(5).max(500),
+      matrixSize: z.number().int().min(2).max(100),
+      chunkSize: z.number().int().min(1).max(50),
     }),
     explanation: z.string().default('Distributed Matrix Multiplication (C = A x B)'),
   }),
@@ -31,31 +31,24 @@ export function regexFallbackParser(prompt) {
     lower.includes('matrix') ||
     lower.includes('multiply') ||
     lower.includes('matmul') ||
-    lower.includes('flop') ||
     lower.includes('algebra') ||
-    lower.includes('dimension')
+    lower.includes('*') ||
+    lower.match(/\d+\s*[\*xX]\s*\d+/)
   ) {
-    let matrixSize = 1000;
+    let matrixSize = 6;
     const sizeMatch =
-      lower.match(/(\d+)\s*(?:x\s*\d+|matrix|dimension|size)/i) ||
+      lower.match(/(\d+)\s*[\*xX]\s*(\d+)/i) ||
+      lower.match(/(\d+)\s*(?:matrix|dimension|size)/i) ||
       lower.match(/(?:size|dim|matrix)\s*(?:of)?\s*(\d+)/i);
     if (sizeMatch) {
-      matrixSize = Math.min(Math.max(parseInt(sizeMatch[1], 10), 100), 3000);
-    } else {
-      const genericNum = lower.match(/\b(\d+)\b/);
-      if (genericNum) {
-        matrixSize = Math.min(Math.max(parseInt(genericNum[1], 10), 100), 3000);
-      }
+      matrixSize = Math.min(Math.max(parseInt(sizeMatch[1], 10), 2), 50);
     }
 
-    let chunkSize = Math.max(10, Math.min(100, Math.ceil(matrixSize / 20)));
+    let chunkSize = 1;
     const chunkMatch = lower.match(/chunk[s]?\s*(?:of)?\s*(\d+)/i) || lower.match(/(\d+)\s*rows/i);
     if (chunkMatch) {
-      chunkSize = Math.max(5, Math.min(250, parseInt(chunkMatch[1], 10)));
+      chunkSize = Math.max(1, Math.min(matrixSize, parseInt(chunkMatch[1], 10)));
     }
-
-    const totalFlops = 2 * matrixSize * matrixSize * matrixSize;
-    const gflopsEst = (totalFlops / 1e9).toFixed(2);
 
     return {
       type: TASK_TYPES.MATRIX_MULTIPLY,
@@ -63,7 +56,7 @@ export function regexFallbackParser(prompt) {
         matrixSize,
         chunkSize,
       },
-      explanation: `Distributed dense matrix multiplication of ${matrixSize}x${matrixSize} matrices (~${gflopsEst} GFLOPs) divided into ${Math.ceil(matrixSize / chunkSize)} row chunks.`,
+      explanation: `Distributed matrix multiplication of ${matrixSize}×${matrixSize} matrices partitioned into ${Math.ceil(matrixSize / chunkSize)} row task(s).`,
       fallback: false,
     };
   }

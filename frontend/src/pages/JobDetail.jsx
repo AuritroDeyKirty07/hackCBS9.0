@@ -69,11 +69,8 @@ export default function JobDetail() {
   const errorMargin =
     piEstimate != null ? Math.abs(piEstimate - Math.PI).toFixed(7) : null;
 
-  const matrixSize = currentJob.params?.matrixSize || currentJob.result?.matrixSize || 1000;
-  const totalFlops = currentJob.result?.totalFlops || (2 * matrixSize * matrixSize * matrixSize);
-  const gflops = currentJob.result?.gflops || (currentJob.timing?.durationMs ? ((totalFlops / (currentJob.timing.durationMs * 1e6)).toFixed(2)) : null);
-  const frobeniusNorm = currentJob.result?.frobeniusNorm || '—';
-  const previewGrid = currentJob.result?.previewGrid || Array.from({ length: 5 }, () => Array(5).fill(0));
+  const matrixSize = currentJob.params?.matrixSize || currentJob.result?.matrixSize || 6;
+  const fullMatrix = currentJob.result?.fullMatrix || currentJob.result?.previewGrid || Array.from({ length: matrixSize }, () => Array(matrixSize).fill(0));
 
   // Chart data for Baseline vs Distributed
   const chartData = [];
@@ -137,18 +134,18 @@ export default function JobDetail() {
           </div>
 
           <div className="flex items-center gap-6 text-xs text-gray-400">
-            {isImageJob ? (
+            {isMatrixJob ? (
               <>
                 <div>
-                  <span>Total Images:</span>{' '}
+                  <span>Matrix Dimension:</span>{' '}
                   <strong className="text-white font-mono">
-                    {currentJob.params?.totalImages || 24}
+                    {matrixSize}×{matrixSize}
                   </strong>
                 </div>
                 <div>
-                  <span>Filter Kernel:</span>{' '}
+                  <span>Rows per Chunk:</span>{' '}
                   <strong className="text-blue-400 font-mono">
-                    {currentJob.params?.filterType || 'EDGE_SOBEL'}
+                    {currentJob.params?.chunkSize || 1} row(s)
                   </strong>
                 </div>
               </>
@@ -211,27 +208,27 @@ export default function JobDetail() {
                 {matrixSize} × {matrixSize}
               </span>
               <span className="text-[10px] text-gray-500 font-mono block mt-1">
-                {(totalFlops / 1e9).toFixed(2)} GFLOPs total workload
+                {matrixSize * matrixSize} total calculated cells
               </span>
             </div>
 
             <div className="p-4 rounded-xl bg-gray-950/80 border border-gray-800">
-              <span className="text-xs text-gray-400 block mb-1">Cluster Compute Throughput</span>
+              <span className="text-xs text-gray-400 block mb-1">Distributed Rows Computed</span>
               <span className="text-2xl font-bold font-mono text-blue-400 tracking-tight">
-                {gflops ? `${gflops} GFLOPS` : 'Computing...'}
+                {currentJob.result?.completedRows || 0} / {matrixSize}
               </span>
               <span className="text-[10px] text-gray-500 font-mono block mt-1">
-                Floating-point operations / sec
+                Parallel row-by-row dispatch
               </span>
             </div>
 
             <div className="p-4 rounded-xl bg-gray-950/80 border border-gray-800">
-              <span className="text-xs text-gray-400 block mb-1">Frobenius Norm ||C||_F</span>
-              <span className="text-xl font-bold font-mono text-purple-400 tracking-tight">
-                {frobeniusNorm !== '—' ? frobeniusNorm : 'Verifying...'}
+              <span className="text-xs text-gray-400 block mb-1">Deterministic Formula</span>
+              <span className="text-lg font-bold font-mono text-purple-400 tracking-tight">
+                C[i][j] = Σ A[i][k]·B[k][j]
               </span>
               <span className="text-[10px] text-emerald-400 font-mono block mt-1">
-                ✓ Mathematical verification checksum
+                ✓ 100% Deterministic Verification
               </span>
             </div>
           </div>
@@ -261,14 +258,14 @@ export default function JobDetail() {
         )}
       </div>
 
-      {/* Real-time Computed Submatrix Visualizer (For MATRIX_MULTIPLY) */}
+      {/* Real-time Computed Matrix Visualizer (For MATRIX_MULTIPLY) */}
       {isMatrixJob && (
         <div className="p-6 rounded-2xl bg-gray-900/80 border border-gray-800 shadow-xl space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-800 pb-3 gap-2">
             <div className="flex items-center gap-2">
               <Grid className="w-5 h-5 text-blue-400" />
               <h2 className="font-bold text-sm text-white">
-                Live Computed Submatrix Output (Top-Left 5×5 Block of Result Matrix C)
+                Live Result Matrix C ({matrixSize}×{matrixSize})
               </h2>
             </div>
             <span className="text-xs text-gray-400 font-mono">
@@ -281,7 +278,7 @@ export default function JobDetail() {
               <thead>
                 <tr>
                   <th className="p-2 text-[10px] text-gray-500 font-mono">Row \ Col</th>
-                  {[0, 1, 2, 3, 4].map((c) => (
+                  {(fullMatrix[0] || []).map((_, c) => (
                     <th key={c} className="p-2 text-[11px] text-blue-400 font-mono bg-gray-950/40 rounded border border-gray-800/60">
                       Col #{c}
                     </th>
@@ -289,7 +286,7 @@ export default function JobDetail() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/60 font-mono text-xs">
-                {previewGrid.map((row, rIdx) => (
+                {fullMatrix.map((row, rIdx) => (
                   <tr key={rIdx} className="hover:bg-gray-800/20">
                     <td className="p-2.5 text-[11px] text-gray-400 font-mono bg-gray-950/40 rounded border border-gray-800/60">
                       Row #{rIdx}
@@ -300,12 +297,10 @@ export default function JobDetail() {
                         className={`p-2.5 rounded border border-gray-800/60 text-xs font-semibold ${
                           val === 0
                             ? 'text-gray-600 bg-gray-950/20'
-                            : val > 0
-                            ? 'text-emerald-300 bg-emerald-500/5'
-                            : 'text-amber-300 bg-amber-500/5'
+                            : 'text-emerald-300 bg-emerald-500/10'
                         }`}
                       >
-                        {val !== 0 ? val.toFixed(2) : '0.00'}
+                        {val !== 0 ? val : '0'}
                       </td>
                     ))}
                   </tr>

@@ -5,7 +5,7 @@ import { Sparkles, Play, Sliders, AlertCircle, Info, Grid, Cpu, Layers } from 'l
 
 export default function NewJob() {
   const [prompt, setPrompt] = useState(
-    'Multiply two 1000x1000 matrices in chunks of 50 rows'
+    'Multiply two 6x6 matrices in chunks of 1 row'
   );
   const [interpreting, setInterpreting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -17,11 +17,11 @@ export default function NewJob() {
   const [sampleChunkSize, setSampleChunkSize] = useState(5_000_000);
 
   // Matrix multiplication parameters
-  const [matrixSize, setMatrixSize] = useState(1000);
-  const [matrixChunkSize, setMatrixChunkSize] = useState(50);
+  const [matrixSize, setMatrixSize] = useState(6);
+  const [matrixChunkSize, setMatrixChunkSize] = useState(1);
 
   const [explanation, setExplanation] = useState(
-    'Dense parallel matrix multiplication of 1000x1000 matrices (~2.00 GFLOPs) partitioned into 20 row chunks'
+    'Parallel matrix multiplication of 6×6 matrices divided into 6 distributed row tasks'
   );
   const [isFallback, setIsFallback] = useState(false);
   const [hasInterpreted, setHasInterpreted] = useState(false);
@@ -93,25 +93,25 @@ export default function NewJob() {
 
   const quickPrompts = [
     {
-      label: '⚡ 800x800 Matrix (1.02 GFLOPs)',
-      prompt: 'Compute dense 800x800 matrix multiplication in chunks of 40 rows',
+      label: '🔢 5×5 Matrix (5 tasks, 1 row/chunk)',
+      prompt: 'Multiply two 5x5 matrices in chunks of 1 row',
       type: 'MATRIX_MULTIPLY',
-      params: { matrixSize: 800, chunkSize: 40 },
-      explanation: 'Dense parallel matrix multiplication of 800x800 matrices (~1.02 GFLOPs) partitioned into 20 row chunks',
+      params: { matrixSize: 5, chunkSize: 1 },
+      explanation: 'Parallel distributed multiplication of 5×5 matrices partitioned into 5 row tasks',
     },
     {
-      label: '⚡ Heavy 1200x1200 Matrix (3.45 GFLOPs)',
-      prompt: 'Heavy workload: Multiply 1200x1200 matrices in chunks of 50 rows',
+      label: '🔢 6×6 Matrix (6 tasks, 1 row/chunk)',
+      prompt: 'Multiply two 6x6 matrices in chunks of 1 row',
       type: 'MATRIX_MULTIPLY',
-      params: { matrixSize: 1200, chunkSize: 50 },
-      explanation: 'High-intensity 1200x1200 matrix multiplication (~3.45 GFLOPs) partitioned into 24 row chunks',
+      params: { matrixSize: 6, chunkSize: 1 },
+      explanation: 'Parallel distributed multiplication of 6×6 matrices partitioned into 6 row tasks',
     },
     {
-      label: '🚀 Ultra 1600x1600 Matrix (8.19 GFLOPs)',
-      prompt: 'Ultra workload: Multiply 1600x1600 matrices in chunks of 50 rows',
+      label: '⚡ 8×8 Matrix (4 tasks, 2 rows/chunk)',
+      prompt: 'Multiply two 8x8 matrices in chunks of 2 rows',
       type: 'MATRIX_MULTIPLY',
-      params: { matrixSize: 1600, chunkSize: 50 },
-      explanation: 'Supercomputing benchmark: 1600x1600 dense matrix multiplication (~8.19 GFLOPs) in 32 row chunks',
+      params: { matrixSize: 8, chunkSize: 2 },
+      explanation: 'Parallel distributed multiplication of 8×8 matrices partitioned into 4 tasks of 2 rows',
     },
     {
       label: '🔢 Monte Carlo Pi (200M)',
@@ -276,15 +276,15 @@ export default function NewJob() {
               </label>
               <input
                 type="number"
-                min={100}
-                max={3000}
+                min={2}
+                max={20}
                 required
                 value={matrixSize}
-                onChange={(e) => setMatrixSize(parseInt(e.target.value, 10) || 100)}
+                onChange={(e) => setMatrixSize(parseInt(e.target.value, 10) || 2)}
                 className="w-full px-3.5 py-2.5 rounded-lg bg-gray-950 border border-gray-800 text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors"
               />
               <p className="text-[11px] text-gray-500 mt-1">
-                Total operations: <strong className="text-blue-400 font-mono">{(2 * matrixSize * matrixSize * matrixSize / 1e9).toFixed(2)} GFLOPs</strong>
+                Computes <strong className="text-blue-400 font-mono">{matrixSize}×{matrixSize}</strong> dense product ({matrixSize * matrixSize} total elements)
               </p>
             </div>
 
@@ -294,15 +294,15 @@ export default function NewJob() {
               </label>
               <input
                 type="number"
-                min={5}
-                max={250}
+                min={1}
+                max={matrixSize}
                 required
                 value={matrixChunkSize}
-                onChange={(e) => setMatrixChunkSize(parseInt(e.target.value, 10) || 5)}
+                onChange={(e) => setMatrixChunkSize(parseInt(e.target.value, 10) || 1)}
                 className="w-full px-3.5 py-2.5 rounded-lg bg-gray-950 border border-gray-800 text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors"
               />
               <p className="text-[11px] text-gray-500 mt-1">
-                Partitions into <strong className="text-amber-400 font-mono">{calculatedTasks}</strong> parallel sub-tasks
+                Partitions into <strong className="text-amber-400 font-mono">{calculatedTasks}</strong> distributed task(s)
               </p>
             </div>
           </div>

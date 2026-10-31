@@ -58,8 +58,8 @@ router.post('/', async (req, res, next) => {
       jobParams = { totalSamples, chunkSize };
     } else if (jobType === TASK_TYPES.MATRIX_MULTIPLY) {
       let { matrixSize, chunkSize } = params || {};
-      matrixSize = Math.min(Math.max(parseInt(matrixSize, 10) || 1000, 100), 4000);
-      chunkSize = Math.min(Math.max(parseInt(chunkSize, 10) || 50, 5), 500);
+      matrixSize = Math.min(Math.max(parseInt(matrixSize, 10) || 6, 2), 50);
+      chunkSize = Math.min(Math.max(parseInt(chunkSize, 10) || 1, 1), matrixSize);
       jobParams = { matrixSize, chunkSize };
     }
 
