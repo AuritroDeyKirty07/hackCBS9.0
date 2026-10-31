@@ -1,6 +1,6 @@
 import { TASK_TYPES } from 'meshcompute-shared/constants.js';
 import { runMonteCarloPi } from './montecarloPi.js';
-import { runImageBatchProcess } from './imageBatchProcess.js';
+import { runMatrixMultiply } from './matrixMultiply.js';
 
 /**
  * Extensible Task Registry.
@@ -8,7 +8,7 @@ import { runImageBatchProcess } from './imageBatchProcess.js';
  */
 export const taskRegistry = new Map([
   [TASK_TYPES.MONTE_CARLO_PI, runMonteCarloPi],
-  [TASK_TYPES.IMAGE_BATCH_PROCESS, runImageBatchProcess],
+  [TASK_TYPES.MATRIX_MULTIPLY, runMatrixMultiply],
 ]);
 
 export function getTaskHandler(type) {

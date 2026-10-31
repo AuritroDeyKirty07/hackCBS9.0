@@ -12,13 +12,12 @@ const jobConfigSchema = z.discriminatedUnion('type', [
     explanation: z.string().default('Monte Carlo Pi estimation'),
   }),
   z.object({
-    type: z.literal(TASK_TYPES.IMAGE_BATCH_PROCESS),
+    type: z.literal(TASK_TYPES.MATRIX_MULTIPLY),
     params: z.object({
-      totalImages: z.number().int().min(1).max(10_000),
-      chunkSize: z.number().int().min(1).max(100),
-      filterType: z.enum(['EDGE_SOBEL', 'SEPIA', 'GRAYSCALE']).default('EDGE_SOBEL'),
+      matrixSize: z.number().int().min(100).max(4000),
+      chunkSize: z.number().int().min(5).max(500),
     }),
-    explanation: z.string().default('Distributed batch image processing and edge detection'),
+    explanation: z.string().default('Distributed Matrix Multiplication (C = A x B)'),
   }),
 ]);
 
@@ -29,42 +28,43 @@ export function regexFallbackParser(prompt) {
   const lower = (prompt || '').toLowerCase();
 
   if (
-    lower.includes('image') ||
-    lower.includes('photo') ||
-    lower.includes('frame') ||
-    lower.includes('filter') ||
-    lower.includes('render')
+    lower.includes('matrix') ||
+    lower.includes('multiply') ||
+    lower.includes('matmul') ||
+    lower.includes('flop') ||
+    lower.includes('algebra') ||
+    lower.includes('dimension')
   ) {
-    let totalImages = 24;
-    const imgMatch = lower.match(/(\d+)\s*(?:image|photo|frame|picture)/i);
-    if (imgMatch) {
-      totalImages = Math.min(Math.max(parseInt(imgMatch[1], 10), 1), 500);
+    let matrixSize = 1000;
+    const sizeMatch =
+      lower.match(/(\d+)\s*(?:x\s*\d+|matrix|dimension|size)/i) ||
+      lower.match(/(?:size|dim|matrix)\s*(?:of)?\s*(\d+)/i);
+    if (sizeMatch) {
+      matrixSize = Math.min(Math.max(parseInt(sizeMatch[1], 10), 100), 3000);
     } else {
       const genericNum = lower.match(/\b(\d+)\b/);
       if (genericNum) {
-        totalImages = Math.min(Math.max(parseInt(genericNum[1], 10), 1), 500);
+        matrixSize = Math.min(Math.max(parseInt(genericNum[1], 10), 100), 3000);
       }
     }
 
-    let filterType = 'EDGE_SOBEL';
-    if (lower.includes('sepia')) filterType = 'SEPIA';
-    else if (lower.includes('gray') || lower.includes('grey') || lower.includes('bw')) filterType = 'GRAYSCALE';
-
-    let chunkSize = Math.max(1, Math.min(4, Math.ceil(totalImages / 8)));
-    const chunkMatch = lower.match(/chunk[s]?\s*(?:of)?\s*(\d+)/i);
+    let chunkSize = Math.max(10, Math.min(100, Math.ceil(matrixSize / 20)));
+    const chunkMatch = lower.match(/chunk[s]?\s*(?:of)?\s*(\d+)/i) || lower.match(/(\d+)\s*rows/i);
     if (chunkMatch) {
-      chunkSize = Math.max(1, Math.min(20, parseInt(chunkMatch[1], 10)));
+      chunkSize = Math.max(5, Math.min(250, parseInt(chunkMatch[1], 10)));
     }
 
+    const totalFlops = 2 * matrixSize * matrixSize * matrixSize;
+    const gflopsEst = (totalFlops / 1e9).toFixed(2);
+
     return {
-      type: TASK_TYPES.IMAGE_BATCH_PROCESS,
+      type: TASK_TYPES.MATRIX_MULTIPLY,
       params: {
-        totalImages,
+        matrixSize,
         chunkSize,
-        filterType,
       },
-      explanation: `Parallel image processing & convolution of ${totalImages} frames using ${filterType} filters divided into ${Math.ceil(totalImages / chunkSize)} distributed chunks.`,
-      fallback: false, // Clean user-facing result
+      explanation: `Distributed dense matrix multiplication of ${matrixSize}x${matrixSize} matrices (~${gflopsEst} GFLOPs) divided into ${Math.ceil(matrixSize / chunkSize)} row chunks.`,
+      fallback: false,
     };
   }
 
@@ -149,11 +149,11 @@ export async function interpretJobPrompt(prompt) {
     const systemInstruction = `You are a job configuration compiler for MeshCompute, a distributed computing network.
 Supported job types:
 1. "MONTE_CARLO_PI": params { totalSamples: number, chunkSize: number }
-2. "IMAGE_BATCH_PROCESS": params { totalImages: number, chunkSize: number, filterType: "EDGE_SOBEL" | "SEPIA" | "GRAYSCALE" }
+2. "MATRIX_MULTIPLY": params { matrixSize: number (e.g. 800, 1000, 1500), chunkSize: number (e.g. 50, 100) }
 
 Output ONLY valid JSON matching:
 {
-  "type": "MONTE_CARLO_PI" | "IMAGE_BATCH_PROCESS",
+  "type": "MONTE_CARLO_PI" | "MATRIX_MULTIPLY",
   "params": { ... },
   "explanation": "<short explanation>"
 }`;

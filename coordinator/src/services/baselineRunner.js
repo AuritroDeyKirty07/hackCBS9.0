@@ -1,6 +1,6 @@
 import { Job } from '../models/Job.js';
 import { TASK_TYPES } from 'meshcompute-shared/constants.js';
-import { runImageBatchProcess } from '../../../worker-agent/src/tasks/imageBatchProcess.js';
+import { runMatrixMultiply } from '../../../worker-agent/src/tasks/matrixMultiply.js';
 
 function mulberry32(seed) {
   return function () {
@@ -24,36 +24,30 @@ export async function runBaseline(jobId) {
 
   const startTime = Date.now();
 
-  if (job.type === TASK_TYPES.IMAGE_BATCH_PROCESS) {
-    const totalImages = parseInt(job.params?.totalImages, 10) || 24;
-    const filterType = job.params?.filterType || 'EDGE_SOBEL';
-    const width = parseInt(job.params?.width, 10) || 240;
-    const height = parseInt(job.params?.height, 10) || 180;
-
-    // For larger workloads, benchmark a representative sample on single core to avoid event-loop blocking
-    const sampleCount = Math.min(totalImages, 20);
+  if (job.type === TASK_TYPES.MATRIX_MULTIPLY) {
+    const matrixSize = parseInt(job.params?.matrixSize, 10) || 1000;
+    // Benchmark sample of rows on single core to avoid event-loop blocking
+    const sampleRows = Math.min(matrixSize, 40);
     const sampleStart = Date.now();
 
-    runImageBatchProcess({
-      startIndex: 0,
-      count: sampleCount,
-      filterType,
-      width,
-      height,
+    runMatrixMultiply({
+      matrixSize,
+      startRow: 0,
+      rowCount: sampleRows,
     });
 
-    const sampleElapsedMs = Date.now() - sampleStart;
-    const durationMs = sampleCount === totalImages
+    const sampleElapsedMs = Math.max(1, Date.now() - sampleStart);
+    const durationMs = sampleRows === matrixSize
       ? sampleElapsedMs
-      : Math.round((sampleElapsedMs / sampleCount) * totalImages);
+      : Math.round((sampleElapsedMs / sampleRows) * matrixSize);
 
     job.baseline = {
       durationMs,
-      processedCount: totalImages,
+      matrixSize,
     };
     await job.save();
 
-    return { durationMs, processedCount: totalImages };
+    return { durationMs, matrixSize };
   } else {
     // MONTE_CARLO_PI
     const totalSamples = job.params?.totalSamples || 100_000_000;

@@ -103,8 +103,9 @@ socket.on(WS_EVENTS.TASK_ASSIGN, async (taskData) => {
 
   try {
     const result = await executeTask({ taskId, type, params });
-    if (type === 'IMAGE_BATCH_PROCESS') {
-      console.log(`[Worker] Completed task #${index} in ${result.computeMs}ms (${result.processedCount} images rendered & filtered)`);
+    if (type === 'MATRIX_MULTIPLY') {
+      const gflops = ((result.flops || 0) / (result.computeMs * 1e6)).toFixed(2);
+      console.log(`[Worker] Completed task #${index} in ${result.computeMs}ms (rows ${result.startRow}..${result.startRow + result.rowCount - 1} of ${result.matrixSize}x${result.matrixSize} @ ${gflops} GFLOPS)`);
     } else {
       console.log(`[Worker] Completed task #${index} in ${result.computeMs}ms (${result.inside}/${result.total} inside circle)`);
     }

@@ -56,12 +56,11 @@ router.post('/', async (req, res, next) => {
 
       chunkSize = Math.min(Math.max(chunkSize, LIMITS.MIN_CHUNK_SIZE), LIMITS.MAX_CHUNK_SIZE);
       jobParams = { totalSamples, chunkSize };
-    } else if (jobType === TASK_TYPES.IMAGE_BATCH_PROCESS) {
-      let { totalImages, chunkSize, filterType } = params || {};
-      totalImages = Math.min(Math.max(parseInt(totalImages, 10) || 24, 1), 500);
-      chunkSize = Math.min(Math.max(parseInt(chunkSize, 10) || 2, 1), 50);
-      filterType = filterType || 'EDGE_SOBEL';
-      jobParams = { totalImages, chunkSize, filterType };
+    } else if (jobType === TASK_TYPES.MATRIX_MULTIPLY) {
+      let { matrixSize, chunkSize } = params || {};
+      matrixSize = Math.min(Math.max(parseInt(matrixSize, 10) || 1000, 100), 4000);
+      chunkSize = Math.min(Math.max(parseInt(chunkSize, 10) || 50, 5), 500);
+      jobParams = { matrixSize, chunkSize };
     }
 
     const job = await Job.create({

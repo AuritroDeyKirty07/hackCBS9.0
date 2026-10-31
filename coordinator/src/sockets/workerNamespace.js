@@ -225,8 +225,8 @@ export function setupWorkerNamespace(io) {
           ) {
             isValid = false;
           }
-        } else if (task.type === 'IMAGE_BATCH_PROCESS') {
-          if (!result || !Array.isArray(result.images) || result.processedCount !== task.params.count) {
+        } else if (task.type === 'MATRIX_MULTIPLY') {
+          if (!result || typeof result.flops !== 'number' || result.rowCount !== task.params.rowCount) {
             isValid = false;
           }
         }

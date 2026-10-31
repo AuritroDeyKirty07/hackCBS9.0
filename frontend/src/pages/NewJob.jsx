@@ -1,28 +1,27 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { Sparkles, Play, Sliders, AlertCircle, Info, Image, Cpu } from 'lucide-react';
+import { Sparkles, Play, Sliders, AlertCircle, Info, Grid, Cpu, Layers } from 'lucide-react';
 
 export default function NewJob() {
   const [prompt, setPrompt] = useState(
-    'Batch process 24 images with Sobel edge detection in chunks of 2'
+    'Multiply two 1000x1000 matrices in chunks of 50 rows'
   );
   const [interpreting, setInterpreting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   // Form State
-  const [jobType, setJobType] = useState('IMAGE_BATCH_PROCESS');
+  const [jobType, setJobType] = useState('MATRIX_MULTIPLY');
   const [totalSamples, setTotalSamples] = useState(200_000_000);
   const [sampleChunkSize, setSampleChunkSize] = useState(5_000_000);
 
-  // Image batch parameters
-  const [totalImages, setTotalImages] = useState(24);
-  const [imageChunkSize, setImageChunkSize] = useState(2);
-  const [filterType, setFilterType] = useState('EDGE_SOBEL');
+  // Matrix multiplication parameters
+  const [matrixSize, setMatrixSize] = useState(1000);
+  const [matrixChunkSize, setMatrixChunkSize] = useState(50);
 
   const [explanation, setExplanation] = useState(
-    'Parallel image processing & edge convolution of 24 frames distributed across workers'
+    'Dense parallel matrix multiplication of 1000x1000 matrices (~2.00 GFLOPs) partitioned into 20 row chunks'
   );
   const [isFallback, setIsFallback] = useState(false);
   const [hasInterpreted, setHasInterpreted] = useState(false);
@@ -39,10 +38,9 @@ export default function NewJob() {
       const { type, params, explanation: exp, fallback } = res.data;
 
       setJobType(type);
-      if (type === 'IMAGE_BATCH_PROCESS') {
-        setTotalImages(params.totalImages || 24);
-        setImageChunkSize(params.chunkSize || 2);
-        setFilterType(params.filterType || 'EDGE_SOBEL');
+      if (type === 'MATRIX_MULTIPLY') {
+        setMatrixSize(params.matrixSize || 1000);
+        setMatrixChunkSize(params.chunkSize || 50);
       } else {
         setTotalSamples(params.totalSamples || 100_000_000);
         setSampleChunkSize(params.chunkSize || 5_000_000);
@@ -65,11 +63,10 @@ export default function NewJob() {
 
     try {
       const params =
-        jobType === 'IMAGE_BATCH_PROCESS'
+        jobType === 'MATRIX_MULTIPLY'
           ? {
-            totalImages: Number(totalImages),
-            chunkSize: Number(imageChunkSize),
-            filterType,
+            matrixSize: Number(matrixSize),
+            chunkSize: Number(matrixChunkSize),
           }
           : {
             totalSamples: Number(totalSamples),
@@ -96,25 +93,25 @@ export default function NewJob() {
 
   const quickPrompts = [
     {
-      label: '🖼️ 24 Images (Edge Sobel)',
-      prompt: 'Batch process 24 images with Sobel edge detection in chunks of 2',
-      type: 'IMAGE_BATCH_PROCESS',
-      params: { totalImages: 24, chunkSize: 2, filterType: 'EDGE_SOBEL' },
-      explanation: 'Parallel image processing & edge convolution of 24 frames distributed across workers',
+      label: '⚡ 800x800 Matrix (1.02 GFLOPs)',
+      prompt: 'Compute dense 800x800 matrix multiplication in chunks of 40 rows',
+      type: 'MATRIX_MULTIPLY',
+      params: { matrixSize: 800, chunkSize: 40 },
+      explanation: 'Dense parallel matrix multiplication of 800x800 matrices (~1.02 GFLOPs) partitioned into 20 row chunks',
     },
     {
-      label: '🖼️ 36 Images (Sepia Filter)',
-      prompt: 'Parallel render and apply sepia filter to 36 images in chunks of 3',
-      type: 'IMAGE_BATCH_PROCESS',
-      params: { totalImages: 36, chunkSize: 3, filterType: 'SEPIA' },
-      explanation: 'Distributed sepia tone transformation on 36 procedural image frames in chunks of 3',
+      label: '⚡ Heavy 1200x1200 Matrix (3.45 GFLOPs)',
+      prompt: 'Heavy workload: Multiply 1200x1200 matrices in chunks of 50 rows',
+      type: 'MATRIX_MULTIPLY',
+      params: { matrixSize: 1200, chunkSize: 50 },
+      explanation: 'High-intensity 1200x1200 matrix multiplication (~3.45 GFLOPs) partitioned into 24 row chunks',
     },
     {
-      label: '⚡ Heavy 96 Images Batch',
-      prompt: 'Heavy workload: Process 96 images with edge filters in chunks of 4',
-      type: 'IMAGE_BATCH_PROCESS',
-      params: { totalImages: 96, chunkSize: 4, filterType: 'EDGE_SOBEL' },
-      explanation: 'High-intensity Julia set raymarching & multi-pass convolution on 96 frames in chunks of 4',
+      label: '🚀 Ultra 1600x1600 Matrix (8.19 GFLOPs)',
+      prompt: 'Ultra workload: Multiply 1600x1600 matrices in chunks of 50 rows',
+      type: 'MATRIX_MULTIPLY',
+      params: { matrixSize: 1600, chunkSize: 50 },
+      explanation: 'Supercomputing benchmark: 1600x1600 dense matrix multiplication (~8.19 GFLOPs) in 32 row chunks',
     },
     {
       label: '🔢 Monte Carlo Pi (200M)',
@@ -128,10 +125,9 @@ export default function NewJob() {
   const handleSelectTemplate = (p) => {
     setPrompt(p.prompt);
     setJobType(p.type);
-    if (p.type === 'IMAGE_BATCH_PROCESS') {
-      setTotalImages(p.params.totalImages);
-      setImageChunkSize(p.params.chunkSize);
-      setFilterType(p.params.filterType);
+    if (p.type === 'MATRIX_MULTIPLY') {
+      setMatrixSize(p.params.matrixSize);
+      setMatrixChunkSize(p.params.chunkSize);
     } else {
       setTotalSamples(p.params.totalSamples);
       setSampleChunkSize(p.params.chunkSize);
@@ -142,8 +138,8 @@ export default function NewJob() {
   };
 
   const calculatedTasks =
-    jobType === 'IMAGE_BATCH_PROCESS'
-      ? Math.ceil(totalImages / imageChunkSize) || 0
+    jobType === 'MATRIX_MULTIPLY'
+      ? Math.ceil(matrixSize / matrixChunkSize) || 0
       : Math.ceil(totalSamples / sampleChunkSize) || 0;
 
   return (
@@ -241,16 +237,16 @@ export default function NewJob() {
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => setJobType('IMAGE_BATCH_PROCESS')}
-              className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-colors ${jobType === 'IMAGE_BATCH_PROCESS'
+              onClick={() => setJobType('MATRIX_MULTIPLY')}
+              className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-colors ${jobType === 'MATRIX_MULTIPLY'
                   ? 'bg-blue-600/15 border-blue-500 text-white'
                   : 'bg-gray-950 border-gray-800 text-gray-400 hover:border-gray-700'
                 }`}
             >
-              <Image className="w-5 h-5 text-blue-400 shrink-0" />
+              <Grid className="w-5 h-5 text-blue-400 shrink-0" />
               <div>
-                <div className="font-semibold text-xs text-white">Distributed Image Processing</div>
-                <div className="text-[11px] text-gray-400">Parallel rendering & Sobel convolution</div>
+                <div className="font-semibold text-xs text-white">Distributed Matrix Multiplication</div>
+                <div className="text-[11px] text-gray-400">Heavy O(N³) linear algebra & GFLOPS</div>
               </div>
             </button>
 
@@ -271,55 +267,43 @@ export default function NewJob() {
           </div>
         </div>
 
-        {/* Dynamic Fields for IMAGE_BATCH_PROCESS */}
-        {jobType === 'IMAGE_BATCH_PROCESS' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Dynamic Fields for MATRIX_MULTIPLY */}
+        {jobType === 'MATRIX_MULTIPLY' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-300 mb-1">
-                Total Images to Process
+                Matrix Dimension (N × N)
               </label>
               <input
                 type="number"
-                min={1}
-                max={500}
+                min={100}
+                max={3000}
                 required
-                value={totalImages}
-                onChange={(e) => setTotalImages(parseInt(e.target.value, 10) || 1)}
+                value={matrixSize}
+                onChange={(e) => setMatrixSize(parseInt(e.target.value, 10) || 100)}
                 className="w-full px-3.5 py-2.5 rounded-lg bg-gray-950 border border-gray-800 text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors"
               />
-              <p className="text-[11px] text-gray-500 mt-1">Frames to render & filter</p>
+              <p className="text-[11px] text-gray-500 mt-1">
+                Total operations: <strong className="text-blue-400 font-mono">{(2 * matrixSize * matrixSize * matrixSize / 1e9).toFixed(2)} GFLOPs</strong>
+              </p>
             </div>
 
             <div>
               <label className="block text-xs font-medium text-gray-300 mb-1">
-                Images per Task Chunk
+                Rows per Task Chunk
               </label>
               <input
                 type="number"
-                min={1}
-                max={50}
+                min={5}
+                max={250}
                 required
-                value={imageChunkSize}
-                onChange={(e) => setImageChunkSize(parseInt(e.target.value, 10) || 1)}
+                value={matrixChunkSize}
+                onChange={(e) => setMatrixChunkSize(parseInt(e.target.value, 10) || 5)}
                 className="w-full px-3.5 py-2.5 rounded-lg bg-gray-950 border border-gray-800 text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors"
               />
-              <p className="text-[11px] text-gray-500 mt-1">Will generate {calculatedTasks} tasks</p>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-300 mb-1">
-                Convolution Filter
-              </label>
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg bg-gray-950 border border-gray-800 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
-              >
-                <option value="EDGE_SOBEL">Edge Detection (Sobel)</option>
-                <option value="SEPIA">Sepia Tone</option>
-                <option value="GRAYSCALE">Grayscale / Invert</option>
-              </select>
-              <p className="text-[11px] text-gray-500 mt-1">Multi-pass pixel kernel</p>
+              <p className="text-[11px] text-gray-500 mt-1">
+                Partitions into <strong className="text-amber-400 font-mono">{calculatedTasks}</strong> parallel sub-tasks
+              </p>
             </div>
           </div>
         ) : (

@@ -18,7 +18,7 @@ import {
   Cpu,
   Layers,
   Zap,
-  Image as ImageIcon,
+  Grid,
   Sparkles,
 } from 'lucide-react';
 
@@ -58,7 +58,7 @@ export default function JobDetail() {
     );
   }
 
-  const isImageJob = currentJob.type === 'IMAGE_BATCH_PROCESS';
+  const isMatrixJob = currentJob.type === 'MATRIX_MULTIPLY';
   const isCompleted = currentJob.status === 'completed';
   const progressPct =
     currentJob.totalTasks > 0
@@ -69,8 +69,11 @@ export default function JobDetail() {
   const errorMargin =
     piEstimate != null ? Math.abs(piEstimate - Math.PI).toFixed(7) : null;
 
-  const processedImages = currentJob.result?.images || [];
-  const totalPixels = currentJob.result?.totalPixels || 0;
+  const matrixSize = currentJob.params?.matrixSize || currentJob.result?.matrixSize || 1000;
+  const totalFlops = currentJob.result?.totalFlops || (2 * matrixSize * matrixSize * matrixSize);
+  const gflops = currentJob.result?.gflops || (currentJob.timing?.durationMs ? ((totalFlops / (currentJob.timing.durationMs * 1e6)).toFixed(2)) : null);
+  const frobeniusNorm = currentJob.result?.frobeniusNorm || '—';
+  const previewGrid = currentJob.result?.previewGrid || Array.from({ length: 5 }, () => Array(5).fill(0));
 
   // Chart data for Baseline vs Distributed
   const chartData = [];
@@ -121,13 +124,13 @@ export default function JobDetail() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              {isImageJob ? (
-                <ImageIcon className="w-5 h-5 text-blue-400" />
+              {isMatrixJob ? (
+                <Grid className="w-5 h-5 text-blue-400" />
               ) : (
                 <Layers className="w-5 h-5 text-purple-400" />
               )}
               <h1 className="text-xl font-bold text-white tracking-tight">
-                {isImageJob ? 'Distributed Image Processing Batch' : currentJob.type}
+                {isMatrixJob ? `Distributed Matrix Multiplication (${matrixSize}×${matrixSize})` : currentJob.type}
               </h1>
             </div>
             <p className="text-xs text-gray-400 font-mono mt-1">ID: {currentJob._id}</p>
@@ -200,26 +203,35 @@ export default function JobDetail() {
         </div>
 
         {/* Real-time Result Statistics */}
-        {isImageJob ? (
+        {isMatrixJob ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
             <div className="p-4 rounded-xl bg-gray-950/80 border border-gray-800">
-              <span className="text-xs text-gray-400 block mb-1">Processed Frames</span>
+              <span className="text-xs text-gray-400 block mb-1">Matrix Dimension</span>
               <span className="text-2xl font-bold font-mono text-emerald-400 tracking-tight">
-                {processedImages.length} / {currentJob.params?.totalImages || 24}
+                {matrixSize} × {matrixSize}
+              </span>
+              <span className="text-[10px] text-gray-500 font-mono block mt-1">
+                {(totalFlops / 1e9).toFixed(2)} GFLOPs total workload
               </span>
             </div>
 
             <div className="p-4 rounded-xl bg-gray-950/80 border border-gray-800">
-              <span className="text-xs text-gray-400 block mb-1">Total Pixels Computed</span>
+              <span className="text-xs text-gray-400 block mb-1">Cluster Compute Throughput</span>
               <span className="text-2xl font-bold font-mono text-blue-400 tracking-tight">
-                {totalPixels > 0 ? totalPixels.toLocaleString() : 'Calculating...'}
+                {gflops ? `${gflops} GFLOPS` : 'Computing...'}
+              </span>
+              <span className="text-[10px] text-gray-500 font-mono block mt-1">
+                Floating-point operations / sec
               </span>
             </div>
 
             <div className="p-4 rounded-xl bg-gray-950/80 border border-gray-800">
-              <span className="text-xs text-gray-400 block mb-1">Processing Mode</span>
-              <span className="text-base font-bold font-mono text-purple-400 tracking-tight">
-                Parallel Sobel Convolution
+              <span className="text-xs text-gray-400 block mb-1">Frobenius Norm ||C||_F</span>
+              <span className="text-xl font-bold font-mono text-purple-400 tracking-tight">
+                {frobeniusNorm !== '—' ? frobeniusNorm : 'Verifying...'}
+              </span>
+              <span className="text-[10px] text-emerald-400 font-mono block mt-1">
+                ✓ Mathematical verification checksum
               </span>
             </div>
           </div>
@@ -249,49 +261,58 @@ export default function JobDetail() {
         )}
       </div>
 
-      {/* Real-time Rendered Image Gallery (For IMAGE_BATCH_PROCESS) */}
-      {isImageJob && (
+      {/* Real-time Computed Submatrix Visualizer (For MATRIX_MULTIPLY) */}
+      {isMatrixJob && (
         <div className="p-6 rounded-2xl bg-gray-900/80 border border-gray-800 shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-800 pb-3 gap-2">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-amber-400" />
+              <Grid className="w-5 h-5 text-blue-400" />
               <h2 className="font-bold text-sm text-white">
-                Live Processed Image Gallery ({currentJob.result?.processedImagesCount || processedImages.length} frames completed)
+                Live Computed Submatrix Output (Top-Left 5×5 Block of Result Matrix C)
               </h2>
             </div>
             <span className="text-xs text-gray-400 font-mono">
-              {currentJob.result?.processedImagesCount > processedImages.length
-                ? `Showing ${processedImages.length} preview frames of ${currentJob.result.processedImagesCount} rendered`
-                : 'Real-time worker renders'}
+              Dimension: {matrixSize}×{matrixSize} | Completed Rows: {currentJob.result?.completedRows || 0}/{matrixSize}
             </span>
           </div>
 
-          {processedImages.length === 0 ? (
-            <div className="py-12 text-center text-gray-500 italic text-xs">
-              Waiting for workers to stream completed image frames...
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {processedImages.map((img) => (
-                <div
-                  key={img.imageIndex}
-                  className="p-2 rounded-xl bg-gray-950 border border-gray-800/80 space-y-2 hover:border-blue-500/50 transition-colors"
-                >
-                  <div className="aspect-[4/3] rounded-lg overflow-hidden bg-black flex items-center justify-center">
-                    <img
-                      src={img.previewUrl}
-                      alt={`Frame #${img.imageIndex}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
-                    <span>Frame #{img.imageIndex + 1}</span>
-                    <span className="text-blue-400 font-semibold">160×120</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-center border-collapse">
+              <thead>
+                <tr>
+                  <th className="p-2 text-[10px] text-gray-500 font-mono">Row \ Col</th>
+                  {[0, 1, 2, 3, 4].map((c) => (
+                    <th key={c} className="p-2 text-[11px] text-blue-400 font-mono bg-gray-950/40 rounded border border-gray-800/60">
+                      Col #{c}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800/60 font-mono text-xs">
+                {previewGrid.map((row, rIdx) => (
+                  <tr key={rIdx} className="hover:bg-gray-800/20">
+                    <td className="p-2.5 text-[11px] text-gray-400 font-mono bg-gray-950/40 rounded border border-gray-800/60">
+                      Row #{rIdx}
+                    </td>
+                    {row.map((val, cIdx) => (
+                      <td
+                        key={cIdx}
+                        className={`p-2.5 rounded border border-gray-800/60 text-xs font-semibold ${
+                          val === 0
+                            ? 'text-gray-600 bg-gray-950/20'
+                            : val > 0
+                            ? 'text-emerald-300 bg-emerald-500/5'
+                            : 'text-amber-300 bg-amber-500/5'
+                        }`}
+                      >
+                        {val !== 0 ? val.toFixed(2) : '0.00'}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -398,8 +419,8 @@ export default function JobDetail() {
                     #{task.index}
                   </td>
                   <td className="py-2.5 px-4 text-gray-300 font-mono">
-                    {isImageJob
-                      ? `${task.params?.count || 1} image frame(s)`
+                    {isMatrixJob
+                      ? `Rows #${task.params?.startRow}–${(task.params?.startRow || 0) + (task.params?.rowCount || 0) - 1} (${task.params?.rowCount || 0} rows)`
                       : `${task.params?.samples?.toLocaleString()} samples`}
                   </td>
                   <td className="py-2.5 px-4">
@@ -436,8 +457,8 @@ export default function JobDetail() {
                     {task.result?.computeMs != null ? `${task.result.computeMs}ms` : '—'}
                   </td>
                   <td className="py-2.5 px-4 font-mono text-right text-gray-400">
-                    {isImageJob
-                      ? `${task.result?.images?.length || 0} frames rendered`
+                    {isMatrixJob
+                      ? `${((task.result?.flops || 0) / 1e6).toFixed(1)} MFLOPs`
                       : `${task.result?.inside != null ? task.result.inside.toLocaleString() : '—'}`}
                   </td>
                 </tr>

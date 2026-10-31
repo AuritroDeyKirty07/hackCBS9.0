@@ -1,7 +1,7 @@
 // === Task Types (whitelist) ===
 export const TASK_TYPES = {
   MONTE_CARLO_PI: 'MONTE_CARLO_PI',
-  IMAGE_BATCH_PROCESS: 'IMAGE_BATCH_PROCESS',
+  MATRIX_MULTIPLY: 'MATRIX_MULTIPLY',
 };
 
 // === Statuses ===

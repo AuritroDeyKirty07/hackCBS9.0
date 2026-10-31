@@ -54,15 +54,15 @@ export default function History() {
                       {job._id.slice(0, 8)}...
                     </td>
                     <td className="py-3 px-4 font-medium text-white">
-                      {job.type === 'IMAGE_BATCH_PROCESS' ? (
-                        <span className="text-blue-400">Image Batch Processing</span>
+                      {job.type === 'MATRIX_MULTIPLY' ? (
+                        <span className="text-blue-400">Dense Matrix Multiply</span>
                       ) : (
                         <span className="text-purple-400">Monte Carlo Pi</span>
                       )}
                     </td>
                     <td className="py-3 px-4 text-gray-300 font-mono">
-                      {job.type === 'IMAGE_BATCH_PROCESS'
-                        ? `${job.params?.totalImages || job.result?.processedImagesCount || 0} images`
+                      {job.type === 'MATRIX_MULTIPLY'
+                        ? `${job.params?.matrixSize || job.result?.matrixSize || 1000}×${job.params?.matrixSize || job.result?.matrixSize || 1000} matrix`
                         : `${job.params?.totalSamples?.toLocaleString() || 0} samples`}
                     </td>
                     <td className="py-3 px-4 text-gray-400 font-mono">
@@ -85,8 +85,8 @@ export default function History() {
                     </td>
                     <td className="py-3 px-4 font-mono text-gray-300">{duration}</td>
                     <td className="py-3 px-4 font-mono text-emerald-400">
-                      {job.type === 'IMAGE_BATCH_PROCESS'
-                        ? `${job.result?.processedImagesCount || job.params?.totalImages || 0} frames rendered`
+                      {job.type === 'MATRIX_MULTIPLY'
+                        ? `${job.result?.gflops ? `${job.result.gflops} GFLOPS` : `${job.result?.completedRows || 0} rows`}`
                         : job.result?.piEstimate
                         ? `π ≈ ${job.result.piEstimate.toFixed(6)}`
                         : '—'}

@@ -21,27 +21,24 @@ export function generateDeterministicSeed(jobId, index) {
 export async function splitJobIntoTasks(job) {
   const taskDocs = [];
 
-  if (job.type === TASK_TYPES.IMAGE_BATCH_PROCESS) {
-    const totalImages = parseInt(job.params.totalImages, 10) || 24;
-    const chunkSize = Math.max(1, parseInt(job.params.chunkSize, 10) || 2);
-    const filterType = job.params.filterType || 'EDGE_SOBEL';
+  if (job.type === TASK_TYPES.MATRIX_MULTIPLY) {
+    const matrixSize = parseInt(job.params.matrixSize, 10) || 1000;
+    const chunkSize = Math.max(1, parseInt(job.params.chunkSize, 10) || 50);
 
-    let currentIndex = 0;
+    let startRow = 0;
     let taskIndex = 0;
 
-    while (currentIndex < totalImages) {
-      const count = Math.min(chunkSize, totalImages - currentIndex);
+    while (startRow < matrixSize) {
+      const rowCount = Math.min(chunkSize, matrixSize - startRow);
 
       taskDocs.push({
         job: job._id,
         index: taskIndex,
-        type: TASK_TYPES.IMAGE_BATCH_PROCESS,
+        type: TASK_TYPES.MATRIX_MULTIPLY,
         params: {
-          startIndex: currentIndex,
-          count,
-          filterType,
-          width: 160,
-          height: 120,
+          matrixSize,
+          startRow,
+          rowCount,
         },
         status: TASK_STATUS.PENDING,
         attempt: 1,
@@ -49,7 +46,7 @@ export async function splitJobIntoTasks(job) {
         history: [],
       });
 
-      currentIndex += count;
+      startRow += rowCount;
       taskIndex++;
     }
   } else {
