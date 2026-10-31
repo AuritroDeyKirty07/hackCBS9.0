@@ -1,0 +1,19 @@
+{
+  "name": "meshcompute",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "coordinator",
+    "worker-agent",
+    "frontend"
+  ],
+  "scripts": {
+    "demo": "node scripts/demo.js",
+    "dev:coordinator": "npm -w coordinator run dev",
+    "dev:frontend": "npm -w frontend run dev",
+    "worker": "npm -w worker-agent run start",
+    "submit-job": "npm -w coordinator run submit-job",
+    "test": "npm -w coordinator run test"
+  }
+}

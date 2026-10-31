@@ -1,0 +1,18 @@
+{
+  "name": "meshcompute-worker-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "meshcompute-shared": "*",
+    "socket.io-client": "^4.8.1",
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.4"
+  }
+}
