@@ -67,14 +67,14 @@ export default function NewJob() {
       const params =
         jobType === 'IMAGE_BATCH_PROCESS'
           ? {
-              totalImages: Number(totalImages),
-              chunkSize: Number(imageChunkSize),
-              filterType,
-            }
+            totalImages: Number(totalImages),
+            chunkSize: Number(imageChunkSize),
+            filterType,
+          }
           : {
-              totalSamples: Number(totalSamples),
-              chunkSize: Number(sampleChunkSize),
-            };
+            totalSamples: Number(totalSamples),
+            chunkSize: Number(sampleChunkSize),
+          };
 
       const res = await api.post('/jobs', {
         type: jobType,
@@ -104,8 +104,8 @@ export default function NewJob() {
       prompt: 'Parallel render and apply sepia filter to 36 images',
     },
     {
-      label: '⚡ Heavy 48 Images Batch',
-      prompt: 'Heavy workload: Process 48 images with edge filters in chunks of 4',
+      label: '⚡ Heavy 96 Images Batch',
+      prompt: 'Heavy workload: Process 96 images with edge filters in chunks of 4',
     },
     {
       label: '🔢 Monte Carlo Pi (200M)',
@@ -188,11 +188,10 @@ export default function NewJob() {
           </div>
           {hasInterpreted && (
             <span
-              className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${
-                isFallback
+              className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${isFallback
                   ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                   : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-              }`}
+                }`}
             >
               {isFallback ? '⚡ Compiled via Fallback Parser' : '✨ Compiled by Gemini'}
             </span>
@@ -215,11 +214,10 @@ export default function NewJob() {
             <button
               type="button"
               onClick={() => setJobType('IMAGE_BATCH_PROCESS')}
-              className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-colors ${
-                jobType === 'IMAGE_BATCH_PROCESS'
+              className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-colors ${jobType === 'IMAGE_BATCH_PROCESS'
                   ? 'bg-blue-600/15 border-blue-500 text-white'
                   : 'bg-gray-950 border-gray-800 text-gray-400 hover:border-gray-700'
-              }`}
+                }`}
             >
               <Image className="w-5 h-5 text-blue-400 shrink-0" />
               <div>
@@ -231,11 +229,10 @@ export default function NewJob() {
             <button
               type="button"
               onClick={() => setJobType('MONTE_CARLO_PI')}
-              className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-colors ${
-                jobType === 'MONTE_CARLO_PI'
+              className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-colors ${jobType === 'MONTE_CARLO_PI'
                   ? 'bg-purple-600/15 border-purple-500 text-white'
                   : 'bg-gray-950 border-gray-800 text-gray-400 hover:border-gray-700'
-              }`}
+                }`}
             >
               <Cpu className="w-5 h-5 text-purple-400 shrink-0" />
               <div>

@@ -277,8 +277,12 @@ export function setupWorkerNamespace(io) {
           result: task.result,
         });
 
-        // Trigger job aggregation
-        await updateJobAggregation(jobId, io);
+        // Trigger job aggregation safely without blocking scheduling
+        try {
+          await updateJobAggregation(jobId, io);
+        } catch (aggErr) {
+          console.error('[WorkerNamespace] Aggregation error:', aggErr);
+        }
 
         // More work might be waiting: trigger scheduler
         runScheduler(io);

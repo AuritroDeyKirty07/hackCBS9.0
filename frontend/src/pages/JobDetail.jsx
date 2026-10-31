@@ -255,10 +255,14 @@ export default function JobDetail() {
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-amber-400" />
               <h2 className="font-bold text-sm text-white">
-                Live Processed Image Gallery ({processedImages.length} frames completed)
+                Live Processed Image Gallery ({currentJob.result?.processedImagesCount || processedImages.length} frames completed)
               </h2>
             </div>
-            <span className="text-xs text-gray-500">Real-time worker renders</span>
+            <span className="text-xs text-gray-400 font-mono">
+              {currentJob.result?.processedImagesCount > processedImages.length
+                ? `Showing ${processedImages.length} preview frames of ${currentJob.result.processedImagesCount} rendered`
+                : 'Real-time worker renders'}
+            </span>
           </div>
 
           {processedImages.length === 0 ? (

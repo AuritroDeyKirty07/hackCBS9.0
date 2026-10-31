@@ -33,11 +33,31 @@ export async function updateJobAggregation(jobId, io = null) {
       processedImagesCount += t.result?.processedCount || 0;
     }
 
+    allImages.sort((a, b) => a.imageIndex - b.imageIndex);
+
+    // Keep preview gallery capped to at most 48 representative frames
+    // Prevents MongoDB 16MB BSON limit crash and keeps websocket messages light (<3MB)
+    const MAX_PREVIEWS = 48;
+    let previewImages = allImages;
+    if (allImages.length > MAX_PREVIEWS) {
+      const step = allImages.length / MAX_PREVIEWS;
+      previewImages = [];
+      const seenIndices = new Set();
+      for (let i = 0; i < MAX_PREVIEWS; i++) {
+        const idx = Math.min(Math.floor(i * step), allImages.length - 1);
+        if (!seenIndices.has(idx)) {
+          seenIndices.add(idx);
+          previewImages.push(allImages[idx]);
+        }
+      }
+    }
+
     job.result = {
       ...(job.result || {}),
-      images: allImages.sort((a, b) => a.imageIndex - b.imageIndex),
+      images: previewImages,
       totalPixels,
-      processedImagesCount,
+      processedImagesCount: processedImagesCount || allImages.length,
+      totalProcessed: allImages.length,
     };
   } else {
     // MONTE_CARLO_PI
