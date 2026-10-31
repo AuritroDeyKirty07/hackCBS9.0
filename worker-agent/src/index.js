@@ -95,7 +95,11 @@ socket.on(WS_EVENTS.TASK_ASSIGN, async (taskData) => {
 
   try {
     const result = await executeTask({ taskId, type, params });
-    console.log(`[Worker] Completed task #${index} in ${result.computeMs}ms (${result.inside}/${result.total} inside circle)`);
+    if (type === 'IMAGE_BATCH_PROCESS') {
+      console.log(`[Worker] Completed task #${index} in ${result.computeMs}ms (${result.processedCount} images rendered & filtered)`);
+    } else {
+      console.log(`[Worker] Completed task #${index} in ${result.computeMs}ms (${result.inside}/${result.total} inside circle)`);
+    }
 
     socket.emit(WS_EVENTS.TASK_RESULT, {
       taskId,

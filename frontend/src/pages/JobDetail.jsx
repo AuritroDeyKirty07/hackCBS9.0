@@ -338,13 +338,22 @@ export default function JobDetail() {
               </ResponsiveContainer>
             </div>
 
-            <div className="flex items-center justify-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-semibold gap-2">
-              <Zap className="w-4 h-4" />
-              <span>
-                Distributed Mesh is <strong className="font-mono text-base">{speedup}x</strong>{' '}
-                faster than single-machine computation!
-              </span>
-            </div>
+            {parseFloat(speedup) >= 1 ? (
+              <div className="flex items-center justify-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-semibold gap-2">
+                <Zap className="w-4 h-4" />
+                <span>
+                  Distributed Mesh is <strong className="font-mono text-base">{speedup}x</strong>{' '}
+                  faster than single-machine computation!
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium gap-2">
+                <Gauge className="w-4 h-4 shrink-0" />
+                <span>
+                  Tip: Connect 2+ worker nodes (or increase image batch size) so parallel thread fan-out outweighs network serialization overhead!
+                </span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="p-8 text-center bg-gray-950/40 rounded-xl border border-gray-800/80 text-xs text-gray-500">

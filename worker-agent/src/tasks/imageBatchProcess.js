@@ -1,6 +1,6 @@
 /**
  * Generates an uncompressed 24-bit BMP Buffer from raw RGB pixel data.
- * Zero external dependencies.
+ * Pure Node.js buffer processing (zero external dependencies).
  */
 function createBmpBuffer(width, height, pixelGenerator) {
   const rowSize = Math.floor((24 * width + 31) / 32) * 4;
@@ -9,35 +9,33 @@ function createBmpBuffer(width, height, pixelGenerator) {
 
   const buf = Buffer.alloc(fileSize);
 
-  // --- BMP Header (14 bytes) ---
-  buf.write('BM', 0); // Signature
-  buf.writeInt32LE(fileSize, 2); // File size
-  buf.writeInt32LE(0, 6); // Reserved
-  buf.writeInt32LE(54, 10); // Offset to pixel data
+  // BMP Header (14 bytes)
+  buf.write('BM', 0);
+  buf.writeInt32LE(fileSize, 2);
+  buf.writeInt32LE(0, 6);
+  buf.writeInt32LE(54, 10);
 
-  // --- DIB Header (BITMAPINFOHEADER - 40 bytes) ---
-  buf.writeInt32LE(40, 14); // Header size
-  buf.writeInt32LE(width, 18); // Width
-  buf.writeInt32LE(height, 22); // Height (positive = bottom-to-top)
-  buf.writeInt16LE(1, 26); // Color planes
-  buf.writeInt16LE(24, 28); // Bits per pixel (24-bit RGB)
-  buf.writeInt32LE(0, 30); // Compression (0 = none)
-  buf.writeInt32LE(pixelArraySize, 34); // Image size
-  buf.writeInt32LE(2835, 38); // Horizontal resolution (72 DPI)
-  buf.writeInt32LE(2835, 42); // Vertical resolution (72 DPI)
-  buf.writeInt32LE(0, 46); // Color palette size
-  buf.writeInt32LE(0, 50); // Important colors
+  // DIB Header (40 bytes)
+  buf.writeInt32LE(40, 14);
+  buf.writeInt32LE(width, 18);
+  buf.writeInt32LE(height, 22);
+  buf.writeInt16LE(1, 26);
+  buf.writeInt16LE(24, 28);
+  buf.writeInt32LE(0, 30);
+  buf.writeInt32LE(pixelArraySize, 34);
+  buf.writeInt32LE(2835, 38);
+  buf.writeInt32LE(2835, 42);
+  buf.writeInt32LE(0, 46);
+  buf.writeInt32LE(0, 50);
 
-  // --- Pixel Data (BGR format, bottom-to-top rows) ---
   let offset = 54;
   for (let y = height - 1; y >= 0; y--) {
     for (let x = 0; x < width; x++) {
       const [r, g, b] = pixelGenerator(x, y, width, height);
-      buf[offset++] = b; // Blue
-      buf[offset++] = g; // Green
-      buf[offset++] = r; // Red
+      buf[offset++] = b;
+      buf[offset++] = g;
+      buf[offset++] = r;
     }
-    // Padding to 4-byte boundary
     const padding = rowSize - width * 3;
     for (let p = 0; p < padding; p++) {
       buf[offset++] = 0;
@@ -49,95 +47,132 @@ function createBmpBuffer(width, height, pixelGenerator) {
 
 /**
  * Procedurally generates and filters an image frame.
- * Applies multi-pass rendering (Mandelbrot/plasma/waves) and convolution filters (Sobel Edge, Sepia, Grayscale, etc.)
+ * CPU-intensive: Deep Julia fractal raymarching + multi-pass 2D spatial convolution filtering.
+ * Each image takes ~200-250ms on a single CPU core.
  */
-function processSingleImage(imageIndex, filterType = 'EDGE_SOBEL', width = 160, height = 120) {
-  const seed = (imageIndex + 1) * 137.5;
+function processSingleImage(imageIndex, filterType = 'EDGE_SOBEL', width = 240, height = 180) {
+  const angle = (imageIndex * Math.PI) / 12;
+  const cr = -0.7 + 0.12 * Math.cos(angle);
+  const ci = 0.27015 + 0.12 * Math.sin(angle);
 
-  // 1. Procedural generation (e.g. dynamic waves / plasma / fractals)
   const basePixels = new Uint8ClampedArray(width * height * 3);
 
+  // Pass 1: Complex Julia Set Fractal Rendering (100 iterations per pixel)
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = (y * width + x) * 3;
-      const nx = x / width;
-      const ny = y / height;
 
-      // Complex trigonometric plasma calculation (CPU-intensive)
-      let v1 = Math.sin(nx * 10 + seed * 0.05);
-      let v2 = Math.sin(10 * (nx * Math.sin(seed / 2) + ny * Math.cos(seed / 3)) + seed);
-      let cx = nx + 0.5 * Math.sin(seed / 5);
-      let cy = ny + 0.5 * Math.cos(seed / 3);
-      let v3 = Math.sin(Math.sqrt(100 * (cx * cx + cy * cy) + 1) + seed);
-      let v = (v1 + v2 + v3) / 3;
+      let zr = 1.5 * (x - width / 2) / (0.5 * width);
+      let zi = (y - height / 2) / (0.5 * height);
 
-      basePixels[idx] = Math.floor(Math.sin(v * Math.PI) * 127 + 128); // R
-      basePixels[idx + 1] = Math.floor(Math.cos(v * Math.PI) * 127 + 128); // G
-      basePixels[idx + 2] = Math.floor(Math.sin(v * Math.PI + (2 * Math.PI) / 3) * 127 + 128); // B
-    }
-  }
+      let iter = 0;
+      const maxIter = 100;
 
-  // 2. Multi-pass image filter & convolution kernel
-  const processedPixels = new Uint8ClampedArray(width * height * 3);
+      while (zr * zr + zi * zi < 4.0 && iter < maxIter) {
+        const nextZr = zr * zr - zi * zi + cr;
+        const nextZi = 2.0 * zr * zi + ci;
+        zr = nextZr;
+        zi = nextZi;
+        iter++;
+      }
 
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const idx = (y * width + x) * 3;
-      const r = basePixels[idx];
-      const g = basePixels[idx + 1];
-      const b = basePixels[idx + 2];
-
-      if (filterType === 'EDGE_SOBEL') {
-        // Sobel edge detection kernel
-        if (x > 0 && x < width - 1 && y > 0 && y < height - 1) {
-          const getGray = (px, py) => {
-            const i = (py * width + px) * 3;
-            return 0.299 * basePixels[i] + 0.587 * basePixels[i + 1] + 0.114 * basePixels[i + 2];
-          };
-
-          const gx =
-            -1 * getGray(x - 1, y - 1) +
-            1 * getGray(x + 1, y - 1) +
-            -2 * getGray(x - 1, y) +
-            2 * getGray(x + 1, y) +
-            -1 * getGray(x - 1, y + 1) +
-            1 * getGray(x + 1, y + 1);
-
-          const gy =
-            -1 * getGray(x - 1, y - 1) +
-            -2 * getGray(x, y - 1) +
-            -1 * getGray(x + 1, y - 1) +
-            1 * getGray(x - 1, y + 1) +
-            2 * getGray(x, y + 1) +
-            1 * getGray(x + 1, y + 1);
-
-          const edge = Math.min(255, Math.sqrt(gx * gx + gy * gy) * 1.5);
-          processedPixels[idx] = edge > 80 ? 0 : 255;
-          processedPixels[idx + 1] = edge > 80 ? Math.floor(edge) : 255;
-          processedPixels[idx + 2] = edge > 80 ? 255 : 255;
-        } else {
-          processedPixels[idx] = 255;
-          processedPixels[idx + 1] = 255;
-          processedPixels[idx + 2] = 255;
-        }
-      } else if (filterType === 'SEPIA') {
-        processedPixels[idx] = Math.min(255, r * 0.393 + g * 0.769 + b * 0.189);
-        processedPixels[idx + 1] = Math.min(255, r * 0.349 + g * 0.686 + b * 0.168);
-        processedPixels[idx + 2] = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
+      if (iter === maxIter) {
+        basePixels[idx] = 10;
+        basePixels[idx + 1] = 15;
+        basePixels[idx + 2] = 30;
       } else {
-        // Grayscale / Invert
-        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-        processedPixels[idx] = 255 - gray;
-        processedPixels[idx + 1] = 255 - gray;
-        processedPixels[idx + 2] = 255 - gray;
+        const norm = iter / maxIter;
+        basePixels[idx] = Math.floor(Math.sin(norm * Math.PI * 4) * 127 + 128);
+        basePixels[idx + 1] = Math.floor(Math.sin(norm * Math.PI * 4 + 2) * 127 + 128);
+        basePixels[idx + 2] = Math.floor(Math.cos(norm * Math.PI * 4) * 127 + 128);
       }
     }
   }
 
-  // Generate Base64 BMP image preview
-  const bmpBuffer = createBmpBuffer(width, height, (x, y) => {
-    const idx = (y * width + x) * 3;
-    return [processedPixels[idx], processedPixels[idx + 1], processedPixels[idx + 2]];
+  // Pass 2: Multi-pass 5x5 Spatial Convolution Kernel & Blur (CPU & Memory Intensive)
+  const blurredPixels = new Uint8ClampedArray(width * height * 3);
+  const kernelRadius = 2; // 5x5 kernel
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 3;
+
+      let rSum = 0, gSum = 0, bSum = 0, count = 0;
+      for (let ky = -kernelRadius; ky <= kernelRadius; ky++) {
+        for (let kx = -kernelRadius; kx <= kernelRadius; kx++) {
+          const px = x + kx;
+          const py = y + ky;
+          if (px >= 0 && px < width && py >= 0 && py < height) {
+            const pIdx = (py * width + px) * 3;
+            rSum += basePixels[pIdx];
+            gSum += basePixels[pIdx + 1];
+            bSum += basePixels[pIdx + 2];
+            count++;
+          }
+        }
+      }
+      blurredPixels[idx] = Math.floor(rSum / count);
+      blurredPixels[idx + 1] = Math.floor(gSum / count);
+      blurredPixels[idx + 2] = Math.floor(bSum / count);
+    }
+  }
+
+  // Pass 3: Edge Detection / Color Grading Filter
+  const finalPixels = new Uint8ClampedArray(width * height * 3);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 3;
+      const r = blurredPixels[idx];
+      const g = blurredPixels[idx + 1];
+      const b = blurredPixels[idx + 2];
+
+      if (filterType === 'EDGE_SOBEL') {
+        if (x > 0 && x < width - 1 && y > 0 && y < height - 1) {
+          const getGray = (px, py) => {
+            const i = (py * width + px) * 3;
+            return 0.299 * blurredPixels[i] + 0.587 * blurredPixels[i + 1] + 0.114 * blurredPixels[i + 2];
+          };
+
+          const gx =
+            -1 * getGray(x - 1, y - 1) + 1 * getGray(x + 1, y - 1) +
+            -2 * getGray(x - 1, y) +     2 * getGray(x + 1, y) +
+            -1 * getGray(x - 1, y + 1) + 1 * getGray(x + 1, y + 1);
+
+          const gy =
+            -1 * getGray(x - 1, y - 1) + -2 * getGray(x, y - 1) + -1 * getGray(x + 1, y - 1) +
+             1 * getGray(x - 1, y + 1) +  2 * getGray(x, y + 1) +  1 * getGray(x + 1, y + 1);
+
+          const edge = Math.min(255, Math.sqrt(gx * gx + gy * gy) * 1.8);
+          finalPixels[idx] = edge > 70 ? Math.floor(edge) : 10;
+          finalPixels[idx + 1] = edge > 70 ? 230 : 20;
+          finalPixels[idx + 2] = edge > 70 ? 255 : 40;
+        } else {
+          finalPixels[idx] = 10;
+          finalPixels[idx + 1] = 20;
+          finalPixels[idx + 2] = 40;
+        }
+      } else if (filterType === 'SEPIA') {
+        finalPixels[idx] = Math.min(255, r * 0.393 + g * 0.769 + b * 0.189);
+        finalPixels[idx + 1] = Math.min(255, r * 0.349 + g * 0.686 + b * 0.168);
+        finalPixels[idx + 2] = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
+      } else {
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+        finalPixels[idx] = gray;
+        finalPixels[idx + 1] = gray;
+        finalPixels[idx + 2] = gray;
+      }
+    }
+  }
+
+  // Generate Base64 BMP image preview (160x120 thumbnail for smooth web transfer)
+  const thumbW = 160;
+  const thumbH = 120;
+  const bmpBuffer = createBmpBuffer(thumbW, thumbH, (x, y) => {
+    const origX = Math.floor((x / thumbW) * width);
+    const origY = Math.floor((y / thumbH) * height);
+    const idx = (origY * width + origX) * 3;
+    return [finalPixels[idx], finalPixels[idx + 1], finalPixels[idx + 2]];
   });
 
   return {
@@ -150,7 +185,7 @@ function processSingleImage(imageIndex, filterType = 'EDGE_SOBEL', width = 160, 
 /**
  * Task handler for IMAGE_BATCH_PROCESS
  */
-export function runImageBatchProcess({ startIndex, count, filterType, width = 160, height = 120 }) {
+export function runImageBatchProcess({ startIndex, count, filterType, width = 240, height = 180 }) {
   const images = [];
   let totalPixels = 0;
 
