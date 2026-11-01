@@ -422,14 +422,29 @@ export default function JobDetail() {
                     <div className="font-medium text-white text-[12px] flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
                       <span>
-                        {task.assignedWorkerName ||
+                        {task.completedByWorkerName ||
+                          (task.status === 'completed'
+                            ? [...(task.history || [])].reverse().find((entry) => entry.outcome === 'success')?.workerName
+                            : null) ||
+                          task.assignedWorkerName ||
                           (typeof task.assignedTo === 'object' && task.assignedTo?.name) ||
                           (task.assignedWorkerId ? `node-${task.assignedWorkerId.slice(0, 6)}` : '—')}
+                        {(task.history || []).some((entry) => entry.workerName) && (
+                          <span
+                            className="block text-[9px] text-gray-500 font-normal mt-0.5"
+                            title={(task.history || []).map((entry) => `Attempt ${entry.attempt}: ${entry.workerName || 'unknown'} (${entry.outcome})`).join(' → ')}
+                          >
+                            Attempts: {[...new Set((task.history || []).map((entry) => entry.workerName).filter(Boolean))].join(' → ')}
+                          </span>
+                        )}
                       </span>
                     </div>
                   </td>
-                  <td className="py-2.5 px-4 font-mono text-gray-400">
+                  <td className="py-2.5 px-4 font-mono text-gray-400" title={(task.history || []).map((entry) => `Attempt ${entry.attempt}: ${entry.workerName || entry.workerId || 'unknown'} (${entry.outcome})`).join('\n')}>
                     {task.attempt} / {task.maxAttempts}
+                    {(task.history || []).length > 0 && (
+                      <span className="block text-[9px] text-gray-500">{task.history.length} prior event(s)</span>
+                    )}
                   </td>
                   <td className="py-2.5 px-4">
                     <span

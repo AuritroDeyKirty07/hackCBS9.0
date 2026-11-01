@@ -32,9 +32,11 @@ export async function requeueWorkerTasks(worker, reason, io) {
       task.status = TASK_STATUS.FAILED;
       task.history.push({
         workerId: worker.workerId,
+        workerName: worker.name,
         attempt: task.attempt,
         outcome: `${reason}_max_attempts_exceeded`,
         at: new Date(),
+        startedAt: task.startedAt,
       });
       await task.save();
 
@@ -53,9 +55,11 @@ export async function requeueWorkerTasks(worker, reason, io) {
     } else {
       task.history.push({
         workerId: worker.workerId,
+        workerName: worker.name,
         attempt: task.attempt,
         outcome: reason,
         at: new Date(),
+        startedAt: task.startedAt,
       });
       task.status = TASK_STATUS.PENDING;
       task.attempt += 1;
@@ -63,6 +67,7 @@ export async function requeueWorkerTasks(worker, reason, io) {
       task.assignedWorkerId = null;
       task.assignedWorkerName = null;
       task.assignedAt = null;
+      task.startedAt = null;
       await task.save();
       shouldReschedule = true;
     }
@@ -136,9 +141,11 @@ export function startHeartbeatMonitor(io, config) {
           task.status = TASK_STATUS.FAILED;
           task.history.push({
             workerId: task.assignedWorkerId,
+            workerName: (await Worker.findOne({ workerId: task.assignedWorkerId }))?.name || task.assignedWorkerName,
             attempt: task.attempt,
             outcome: 'task_execution_timeout_max_attempts',
             at: new Date(),
+            startedAt: task.startedAt,
           });
           await task.save();
 
@@ -156,9 +163,11 @@ export function startHeartbeatMonitor(io, config) {
         } else {
           task.history.push({
             workerId: task.assignedWorkerId,
+            workerName: (await Worker.findOne({ workerId: task.assignedWorkerId }))?.name || task.assignedWorkerName,
             attempt: task.attempt,
             outcome: 'task_execution_timeout',
             at: new Date(),
+            startedAt: task.startedAt,
           });
           task.status = TASK_STATUS.PENDING;
           task.attempt += 1;
@@ -166,6 +175,7 @@ export function startHeartbeatMonitor(io, config) {
           task.assignedWorkerId = null;
           task.assignedWorkerName = null;
           task.assignedAt = null;
+          task.startedAt = null;
           await task.save();
 
           io.of('/dashboard').emit(DASH_EVENTS.TASK_UPDATE, {

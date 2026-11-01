@@ -143,6 +143,21 @@ router.get('/:id', async (req, res, next) => {
         doc.assignedWorkerName =
           doc.assignedTo?.name || workerMap.get(doc.assignedWorkerId) || doc.assignedWorkerId;
       }
+      if (!doc.completedByWorkerName && doc.completedByWorkerId) {
+        doc.completedByWorkerName = workerMap.get(doc.completedByWorkerId) || doc.completedByWorkerId;
+      }
+      // Resolve names for older attempt-history entries created before workerName was stored.
+      doc.history = (doc.history || []).map((entry) => ({
+        ...entry,
+        workerName: entry.workerName || workerMap.get(entry.workerId) || entry.workerId || null,
+      }));
+      // For legacy completed tasks, the successful attempt is the best available executor record.
+      if (!doc.completedByWorkerName && doc.status === 'completed') {
+        const successfulAttempt = [...doc.history].reverse().find((entry) => entry.outcome === 'success');
+        if (successfulAttempt?.workerName) {
+          doc.completedByWorkerName = successfulAttempt.workerName;
+        }
+      }
       return doc;
     });
 

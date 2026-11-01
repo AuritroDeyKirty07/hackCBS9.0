@@ -195,7 +195,7 @@ export default function NewJob() {
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium transition-colors shadow-lg shadow-indigo-500/20"
           >
             <Sparkles className="w-4 h-4 text-indigo-200" />
-            <span>{interpreting ? 'Compiling with AI...' : 'Compile with Gemini AI'}</span>
+            <span>{interpreting ? 'Compiling with AI...' : 'Compile with Gemini 3.1 Flash-Lite'}</span>
           </button>
         </div>
       </div>
@@ -217,7 +217,7 @@ export default function NewJob() {
                   : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                 }`}
             >
-              {isFallback ? '⚡ Compiled via Fallback Parser' : '✨ Compiled by Gemini'}
+              {isFallback ? '⚡ Compiled via Fallback Parser' : '✨ Compiled by Gemini 3.1 Flash-Lite'}
             </span>
           )}
         </div>

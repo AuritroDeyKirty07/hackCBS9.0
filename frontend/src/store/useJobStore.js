@@ -93,11 +93,17 @@ export const useJobStore = create((set, get) => ({
         );
         if (index >= 0) {
           nextTasks = [...nextTasks];
+          const hasWorkerUpdate = Object.prototype.hasOwnProperty.call(updatedTask, 'workerId');
           const workerName = updatedTask.workerName || updatedTask.assignedWorkerName;
           nextTasks[index] = {
             ...nextTasks[index],
             ...updatedTask,
-            assignedWorkerName: workerName || nextTasks[index].assignedWorkerName,
+            assignedWorkerId: hasWorkerUpdate ? updatedTask.workerId : nextTasks[index].assignedWorkerId,
+            assignedWorkerName: workerName || (hasWorkerUpdate && updatedTask.workerId === null
+              ? null
+              : nextTasks[index].assignedWorkerName),
+            completedByWorkerId: updatedTask.completedByWorkerId || nextTasks[index].completedByWorkerId,
+            completedByWorkerName: updatedTask.completedByWorkerName || nextTasks[index].completedByWorkerName,
           };
         }
       }

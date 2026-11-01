@@ -154,21 +154,38 @@ export function setupWorkerNamespace(io) {
       try {
         const { taskId, attempt } = data;
         const task = await Task.findById(taskId);
-        if (task && task.attempt === attempt && task.status === TASK_STATUS.ASSIGNED) {
-          task.status = TASK_STATUS.RUNNING;
-          await task.save();
+        if (!task) return;
 
-          io.of('/dashboard').emit(DASH_EVENTS.TASK_UPDATE, {
-            taskId: task._id.toString(),
-            jobId: task.job.toString(),
-            index: task.index,
-            status: task.status,
-            workerId: task.assignedWorkerId,
-            workerName: task.assignedWorkerName,
-            assignedWorkerName: task.assignedWorkerName,
-            attempt: task.attempt,
-          });
+        // Never trust the task's stored display name as proof of who sent the event.
+        if (!currentWorkerId || task.assignedWorkerId !== currentWorkerId) {
+          console.warn(
+            `[WorkerNamespace] Rejecting TASK_STARTED for task #${task.index}: socket worker ${currentWorkerId || 'unknown'} is not the assigned worker ${task.assignedWorkerId || 'none'}`
+          );
+          return;
         }
+
+        if (task.attempt !== attempt || task.status !== TASK_STATUS.ASSIGNED) return;
+
+        const worker = await Worker.findOne({ workerId: currentWorkerId });
+        if (!worker) return;
+
+        task.status = TASK_STATUS.RUNNING;
+        task.startedAt = new Date();
+        // Refresh the human-readable name from the authenticated socket's worker record.
+        task.assignedWorkerName = worker.name;
+        await task.save();
+
+        io.of('/dashboard').emit(DASH_EVENTS.TASK_UPDATE, {
+          taskId: task._id.toString(),
+          jobId: task.job.toString(),
+          index: task.index,
+          status: task.status,
+          workerId: currentWorkerId,
+          workerName: worker.name,
+          assignedWorkerName: worker.name,
+          attempt: task.attempt,
+          startedAt: task.startedAt,
+        });
       } catch (err) {
         console.error('[WorkerNamespace] Task started error:', err);
       }
@@ -185,34 +202,38 @@ export function setupWorkerNamespace(io) {
           return;
         }
 
-        // DUPLICATE / LATE RESULT PROTECTION
+        // Ignore duplicate, late or stale results. A result is only valid from
+        // the worker currently assigned to this exact attempt.
         if (task.status === TASK_STATUS.COMPLETED) {
-          console.log(`[WorkerNamespace] Task #${task.index} is already completed. Discarding duplicate result.`);
-          if (task.assignedWorkerId || currentWorkerId) {
-            Worker.updateOne(
-              { workerId: currentWorkerId || task.assignedWorkerId },
-              { $inc: { activeTasks: -1 } }
-            ).catch(() => {});
-          }
+          console.log(`[WorkerNamespace] Task #${task.index} already completed; duplicate result ignored.`);
           return;
         }
-
         if (task.attempt !== attempt) {
           console.log(
-            `[WorkerNamespace] Discarding stale attempt result for task #${task.index} (received attempt ${attempt}, current is ${task.attempt})`
+            `[WorkerNamespace] Stale result ignored for task #${task.index}: received attempt ${attempt}, current attempt ${task.attempt}`
           );
-          if (task.assignedWorkerId || currentWorkerId) {
-            Worker.updateOne(
-              { workerId: currentWorkerId || task.assignedWorkerId },
-              { $inc: { activeTasks: -1 } }
-            ).catch(() => {});
-          }
+          return;
+        }
+        if (
+          !currentWorkerId ||
+          task.assignedWorkerId !== currentWorkerId ||
+          ![TASK_STATUS.ASSIGNED, TASK_STATUS.RUNNING].includes(task.status)
+        ) {
+          console.warn(
+            `[WorkerNamespace] Rejecting result for task #${task.index}: sender=${currentWorkerId || 'unknown'}, assigned=${task.assignedWorkerId || 'none'}, status=${task.status}`
+          );
           return;
         }
 
-        // VALIDATION
-        const computeMs = result?.computeMs || 0;
+        const executor = await Worker.findOne({ workerId: currentWorkerId });
+        if (!executor) {
+          console.warn(`[WorkerNamespace] Result sender ${currentWorkerId} has no registered worker record.`);
+          return;
+        }
+
+        const computeMs = Number.isFinite(result?.computeMs) ? result.computeMs : 0;
         let isValid = true;
+        let validationError = null;
 
         if (task.type === 'MONTE_CARLO_PI') {
           const { inside, total } = result || {};
@@ -224,79 +245,133 @@ export function setupWorkerNamespace(io) {
             total !== task.params.samples
           ) {
             isValid = false;
+            validationError = 'Invalid Monte Carlo result payload';
           }
         } else if (task.type === 'MATRIX_MULTIPLY') {
-          if (!result || typeof result.flops !== 'number' || result.rowCount !== task.params.rowCount) {
+          const expectedRows = task.params.rowCount;
+          const expectedStart = task.params.startRow;
+          if (
+            !result ||
+            !Number.isFinite(result.flops) ||
+            result.rowCount !== expectedRows ||
+            result.startRow !== expectedStart ||
+            !Array.isArray(result.computedRows) ||
+            result.computedRows.length !== expectedRows
+          ) {
             isValid = false;
+            validationError = 'Invalid matrix multiplication result payload';
           }
         }
 
         if (!isValid) {
-          console.error(`[WorkerNamespace] Invalid result received for task ${taskId}`);
-          task.status = TASK_STATUS.PENDING;
-          task.attempt += 1;
+          console.error(`[WorkerNamespace] ${validationError} for task ${taskId}`);
           task.history.push({
-            workerId: task.assignedWorkerId,
+            workerId: executor.workerId,
+            workerName: executor.name,
             attempt,
             outcome: 'invalid_result',
             at: new Date(),
+            startedAt: task.startedAt,
+            completedAt: new Date(),
+            computeMs,
           });
-          await task.save();
-          runScheduler(io);
+
+          const failedAt = new Date();
+          if (task.attempt >= task.maxAttempts) {
+            task.status = TASK_STATUS.FAILED;
+            await task.save();
+            await Job.findByIdAndUpdate(task.job, {
+              status: JOB_STATUS.FAILED,
+              'result.error': `Task #${task.index} returned invalid results after ${task.attempt} attempts`,
+              'timing.finishedAt': failedAt,
+            });
+            io.of('/dashboard').emit(DASH_EVENTS.JOB_UPDATE, {
+              jobId: task.job.toString(),
+              status: JOB_STATUS.FAILED,
+              error: `Task #${task.index} returned invalid results after ${task.attempt} attempts`,
+            });
+          } else {
+            task.status = TASK_STATUS.PENDING;
+            task.attempt += 1;
+            task.assignedTo = null;
+            task.assignedWorkerId = null;
+            task.assignedWorkerName = null;
+            task.assignedAt = null;
+            task.startedAt = null;
+            await task.save();
+          }
+
+          executor.activeTasks = Math.max(0, (executor.activeTasks || 0) - 1);
+          await executor.save();
+          io.of('/dashboard').emit(DASH_EVENTS.TASK_UPDATE, {
+            taskId: task._id.toString(),
+            jobId: task.job.toString(),
+            index: task.index,
+            status: task.status,
+            workerId: task.status === TASK_STATUS.PENDING ? null : executor.workerId,
+            workerName: task.status === TASK_STATUS.PENDING ? null : executor.name,
+            assignedWorkerName: task.status === TASK_STATUS.PENDING ? null : executor.name,
+            attempt: task.attempt,
+          });
+          if (task.status === TASK_STATUS.PENDING) runScheduler(io);
           return;
         }
 
-        // Mark task completed
+        // Persist the actual sender, not merely the worker name copied at assignment time.
+        const completedAt = new Date();
         task.status = TASK_STATUS.COMPLETED;
-        task.completedAt = new Date();
+        task.completedAt = completedAt;
+        task.completedByWorkerId = executor.workerId;
+        task.completedByWorkerName = executor.name;
+        task.assignedWorkerId = executor.workerId;
+        task.assignedWorkerName = executor.name;
         task.result = { ...result, computeMs };
         task.history.push({
-          workerId: task.assignedWorkerId,
+          workerId: executor.workerId,
+          workerName: executor.name,
           attempt,
           outcome: 'success',
-          at: new Date(),
+          at: completedAt,
+          startedAt: task.startedAt,
+          completedAt,
+          computeMs,
         });
         await task.save();
 
-        // Update worker stats
-        if (task.assignedWorkerId) {
-          const worker = await Worker.findOne({ workerId: task.assignedWorkerId });
-          if (worker) {
-            worker.activeTasks = Math.max(0, (worker.activeTasks || 1) - 1);
-            worker.stats.tasksCompleted = (worker.stats.tasksCompleted || 0) + 1;
-            worker.stats.totalComputeMs = (worker.stats.totalComputeMs || 0) + (computeMs || 0);
-            await worker.save();
+        executor.activeTasks = Math.max(0, (executor.activeTasks || 0) - 1);
+        executor.stats.tasksCompleted = (executor.stats.tasksCompleted || 0) + 1;
+        executor.stats.totalComputeMs = (executor.stats.totalComputeMs || 0) + computeMs;
+        await executor.save();
 
-            io.of('/dashboard').emit(DASH_EVENTS.WORKER_UPDATE, {
-              workerId: worker.workerId,
-              status: worker.status,
-              activeTasks: worker.activeTasks,
-              stats: worker.stats,
-            });
-          }
-        }
+        io.of('/dashboard').emit(DASH_EVENTS.WORKER_UPDATE, {
+          workerId: executor.workerId,
+          name: executor.name,
+          status: executor.status,
+          activeTasks: executor.activeTasks,
+          stats: executor.stats,
+        });
 
-        // Notify dashboard
         io.of('/dashboard').emit(DASH_EVENTS.TASK_UPDATE, {
           taskId: task._id.toString(),
           jobId: task.job.toString(),
           index: task.index,
           status: task.status,
-          workerId: task.assignedWorkerId,
-          workerName: task.assignedWorkerName,
-          assignedWorkerName: task.assignedWorkerName,
+          workerId: executor.workerId,
+          workerName: executor.name,
+          assignedWorkerName: executor.name,
+          completedByWorkerId: executor.workerId,
+          completedByWorkerName: executor.name,
           attempt: task.attempt,
           result: task.result,
+          history: task.history,
         });
 
-        // Trigger job aggregation safely without blocking scheduling
         try {
-          await updateJobAggregation(jobId, io);
+          await updateJobAggregation(jobId || task.job.toString(), io);
         } catch (aggErr) {
           console.error('[WorkerNamespace] Aggregation error:', aggErr);
         }
 
-        // More work might be waiting: trigger scheduler
         runScheduler(io);
       } catch (err) {
         console.error('[WorkerNamespace] Task result error:', err);
@@ -309,42 +384,61 @@ export function setupWorkerNamespace(io) {
         const { taskId, attempt, message } = data;
         const task = await Task.findById(taskId);
         if (!task || task.status === TASK_STATUS.COMPLETED) return;
+        if (task.attempt !== attempt || task.assignedWorkerId !== currentWorkerId) return;
 
-        if (task.attempt === attempt) {
-          console.warn(`[WorkerNamespace] Task #${task.index} error from worker: ${message}`);
-          if (task.attempt >= task.maxAttempts) {
-            task.status = TASK_STATUS.FAILED;
-            task.history.push({
-              workerId: task.assignedWorkerId,
-              attempt,
-              outcome: `worker_error: ${message}`,
-              at: new Date(),
-            });
-            await task.save();
-          } else {
-            task.status = TASK_STATUS.PENDING;
-            task.attempt += 1;
-            task.history.push({
-              workerId: task.assignedWorkerId,
-              attempt,
-              outcome: `worker_error: ${message}`,
-              at: new Date(),
-            });
-            task.assignedTo = null;
-            task.assignedWorkerId = null;
-            await task.save();
-          }
+        const executor = await Worker.findOne({ workerId: currentWorkerId });
+        const failedAt = new Date();
+        task.history.push({
+          workerId: executor?.workerId || currentWorkerId,
+          workerName: executor?.name || task.assignedWorkerName,
+          attempt,
+          outcome: `worker_error: ${message}`,
+          at: failedAt,
+          startedAt: task.startedAt,
+          completedAt: failedAt,
+        });
 
-          // Decrement worker active tasks
-          if (task.assignedWorkerId) {
-            await Worker.findOneAndUpdate(
-              { workerId: task.assignedWorkerId },
-              { $inc: { activeTasks: -1 } }
-            );
-          }
-
-          runScheduler(io);
+        if (task.attempt >= task.maxAttempts) {
+          task.status = TASK_STATUS.FAILED;
+          await task.save();
+          await Job.findByIdAndUpdate(task.job, {
+            status: JOB_STATUS.FAILED,
+            'result.error': `Task #${task.index} failed after ${task.attempt} attempts: ${message}`,
+            'timing.finishedAt': failedAt,
+          });
+          io.of('/dashboard').emit(DASH_EVENTS.JOB_UPDATE, {
+            jobId: task.job.toString(),
+            status: JOB_STATUS.FAILED,
+            error: `Task #${task.index} failed after ${task.attempt} attempts`,
+          });
+        } else {
+          task.status = TASK_STATUS.PENDING;
+          task.attempt += 1;
+          task.assignedTo = null;
+          task.assignedWorkerId = null;
+          task.assignedWorkerName = null;
+          task.assignedAt = null;
+          task.startedAt = null;
+          await task.save();
         }
+
+        if (executor) {
+          executor.activeTasks = Math.max(0, (executor.activeTasks || 0) - 1);
+          await executor.save();
+        }
+
+        io.of('/dashboard').emit(DASH_EVENTS.TASK_UPDATE, {
+          taskId: task._id.toString(),
+          jobId: task.job.toString(),
+          index: task.index,
+          status: task.status,
+          workerId: task.status === TASK_STATUS.PENDING ? null : currentWorkerId,
+          workerName: task.status === TASK_STATUS.PENDING ? null : executor?.name,
+          assignedWorkerName: task.status === TASK_STATUS.PENDING ? null : executor?.name,
+          attempt: task.attempt,
+        });
+
+        if (task.status === TASK_STATUS.PENDING) runScheduler(io);
       } catch (err) {
         console.error('[WorkerNamespace] Task error handler failed:', err);
       }

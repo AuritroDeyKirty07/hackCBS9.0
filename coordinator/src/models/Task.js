@@ -43,6 +43,20 @@ const taskSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Immutable identity of the worker whose result was accepted.
+    completedByWorkerId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    completedByWorkerName: {
+      type: String,
+      default: null,
+    },
+    startedAt: {
+      type: Date,
+      default: null,
+    },
     attempt: {
       type: Number,
       default: 1,
@@ -66,9 +80,13 @@ const taskSchema = new mongoose.Schema(
     history: [
       {
         workerId: { type: String, default: null },
+        workerName: { type: String, default: null },
         attempt: { type: Number, required: true },
         outcome: { type: String, required: true },
         at: { type: Date, default: Date.now },
+        startedAt: { type: Date, default: null },
+        completedAt: { type: Date, default: null },
+        computeMs: { type: Number, default: null },
       },
     ],
   },

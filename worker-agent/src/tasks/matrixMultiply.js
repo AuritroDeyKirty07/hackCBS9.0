@@ -56,6 +56,9 @@ export function runMatrixMultiply({ matrixSize = 6, startRow = 0, rowCount = 1 }
     startRow: start,
     rowCount: end - start,
     matrixSize: N,
+    // Conventional operation count for this output-row chunk: 2 * M * N * K.
+    // For square N x N matrices and (end - start) output rows: 2 * N * N * rows.
+    flops: 2 * N * N * (end - start),
     computeMs,
     computedRows,
   };

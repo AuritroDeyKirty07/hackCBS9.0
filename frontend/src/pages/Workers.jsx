@@ -1,13 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useWorkerStore } from '../store/useWorkerStore.js';
 import { useAuthStore } from '../store/useAuthStore.js';
-import { Server, Copy, Check, Terminal, Cpu, HardDrive, Trash2 } from 'lucide-react';
+import { Server, Copy, Check, Terminal, Trash2, Laptop, Globe, ShieldCheck } from 'lucide-react';
+import { API_URL } from '../lib/api.js';
 
 export default function Workers() {
   const { workers, fetchWorkers, deleteWorker, cleanupOfflineWorkers } = useWorkerStore();
   const { user } = useAuthStore();
   const [copied, setCopied] = useState(false);
   const [cleaning, setCleaning] = useState(false);
+  const [workerName, setWorkerName] = useState('my-computer');
+  const [coordinatorUrl, setCoordinatorUrl] = useState(API_URL.replace(/\/api\/?$/, ''));
+  const [platform, setPlatform] = useState('windows');
 
   useEffect(() => {
     fetchWorkers();
@@ -17,8 +21,27 @@ export default function Workers() {
 
   const workerToken = user?.workerToken || 'demo-token';
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(workerToken);
+  const safeName = workerName.trim().replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 40) || 'my-computer';
+  const normalizeCoordinator = (value) => {
+    let address = value.trim();
+    if (!address) return '';
+    if (!/^https?:\/\//i.test(address)) address = `http://${address}`;
+    try {
+      const parsed = new URL(address);
+      if (!parsed.port && parsed.protocol === 'http:') parsed.port = '4000';
+      return parsed.origin;
+    } catch {
+      return '';
+    }
+  };
+  const normalizedCoordinator = normalizeCoordinator(coordinatorUrl);
+  const shellQuote = (value) => `'${String(value).replace(/'/g, "'\\''")}'`;
+  const command = platform === 'windows'
+    ? `$env:COORDINATOR_URL=${shellQuote(normalizedCoordinator)}; $env:WORKER_TOKEN=${shellQuote(workerToken)}; $env:WORKER_NAME=${shellQuote(safeName)}; npm run worker`
+    : `COORDINATOR_URL=${shellQuote(normalizedCoordinator)} WORKER_TOKEN=${shellQuote(workerToken)} WORKER_NAME=${shellQuote(safeName)} npm run worker`;
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(command);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -49,42 +72,48 @@ export default function Workers() {
         </p>
       </div>
 
-      {/* Worker Token & Join Instructions Card */}
-      <div className="p-6 rounded-2xl bg-gradient-to-br from-gray-900 to-gray-950 border border-gray-800 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-base font-semibold text-white flex items-center gap-2">
-              <Terminal className="w-5 h-5 text-blue-400" />
-              <span>Connect a New Machine to Cluster</span>
-            </h2>
-            <p className="text-xs text-gray-400 mt-1">
-              Run the worker agent on any computer with this secret token to lend CPU power.
-            </p>
-          </div>
-          <button
-            onClick={handleCopy}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-medium transition-colors border border-gray-700 shrink-0"
-          >
-            {copied ? (
-              <>
-                <Check className="w-4 h-4 text-emerald-400" />
-                <span className="text-emerald-400">Copied!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4 text-gray-400" />
-                <span>Copy Worker Token</span>
-              </>
-            )}
-          </button>
+      {/* Worker connection wizard */}
+      <section className="p-6 rounded-2xl bg-gradient-to-br from-gray-900 to-gray-950 border border-gray-800 shadow-xl space-y-5">
+        <div>
+          <h2 className="text-base font-semibold text-white flex items-center gap-2">
+            <Terminal className="w-5 h-5 text-blue-400" /> Connect another computer
+          </h2>
+          <p className="text-xs text-gray-400 mt-1">Configure the worker agent for this cluster and generate the exact command to run on the joining computer.</p>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-gray-950 border border-gray-800 font-mono text-xs text-blue-400 overflow-x-auto">
-          <code>
-            WORKER_TOKEN={workerToken} WORKER_NAME=my-laptop npm run worker
-          </code>
+        <div className="grid md:grid-cols-2 gap-4">
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium text-gray-300">Host / Coordinator IP or URL</span>
+            <div className="relative"><Globe className="absolute left-3 top-3 w-4 h-4 text-gray-500" /><input value={coordinatorUrl} onChange={(e) => setCoordinatorUrl(e.target.value)} placeholder="https://your-coordinator.example.com" className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-gray-950 border border-gray-700 text-sm text-white outline-none focus:border-blue-500" /></div>
+            <span className="text-[10px] text-gray-500">Enter a host IP (for example 192.168.1.20) or deployed coordinator URL. A plain IP defaults to port 4000.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium text-gray-300">Computer name</span>
+            <div className="relative"><Laptop className="absolute left-3 top-3 w-4 h-4 text-gray-500" /><input value={workerName} onChange={(e) => setWorkerName(e.target.value)} maxLength={40} placeholder="e.g. lab-pc-01" className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-gray-950 border border-gray-700 text-sm text-white outline-none focus:border-blue-500" /></div>
+            <span className="text-[10px] text-gray-500">Letters, numbers, hyphens and underscores are supported.</span>
+          </label>
         </div>
-      </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs text-gray-400">Joining computer OS</span>
+          <div className="flex rounded-lg border border-gray-700 p-1 bg-gray-950">
+            {['windows', 'mac/linux'].map((os) => <button key={os} onClick={() => setPlatform(os === 'windows' ? 'windows' : 'unix')} className={`px-3 py-1.5 rounded-md text-xs capitalize ${((os === 'windows' && platform === 'windows') || (os === 'mac/linux' && platform === 'unix')) ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>{os}</button>)}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold text-gray-300">Command to run on the joining computer</span><button onClick={handleCopy} disabled={!normalizedCoordinator || !workerToken} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-semibold"><Copy className="w-3.5 h-3.5" />{copied ? 'Copied' : 'Copy command'}</button></div>
+          <pre className="whitespace-pre-wrap break-all p-4 rounded-xl bg-black border border-gray-800 text-[11px] leading-relaxed text-emerald-300">{command}</pre>
+        </div>
+
+        <div className="grid sm:grid-cols-3 gap-3 text-xs">
+          <div className="rounded-lg bg-gray-950/80 border border-gray-800 p-3"><b className="text-white block mb-1">1. Get the project</b><span className="text-gray-400">Clone/download MeshCompute on the joining PC and open a terminal in its root folder.</span></div>
+          <div className="rounded-lg bg-gray-950/80 border border-gray-800 p-3"><b className="text-white block mb-1">2. Install dependencies</b><span className="text-gray-400">Run <code className="text-blue-300">npm install</code> once in the project root.</span></div>
+          <div className="rounded-lg bg-gray-950/80 border border-gray-800 p-3"><b className="text-white block mb-1">3. Join the cluster</b><span className="text-gray-400">Paste the generated command into that computer's terminal. It will register and send heartbeats.</span></div>
+        </div>
+
+        <div className="flex gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-[11px] text-amber-200"><ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" /><p><b>Security:</b> This page cannot execute commands on a visitor's PC. The user must run the command locally. Treat the worker token as a password; only share it with trusted machines. For a cloud deployment, ensure the coordinator URL is public and uses HTTPS/WSS.</p></div>
+      </section>
 
       {/* Workers Table */}
       <div className="bg-gray-900/60 border border-gray-800 rounded-xl overflow-hidden shadow-xl">

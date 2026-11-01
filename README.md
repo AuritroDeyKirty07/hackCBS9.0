@@ -36,7 +36,7 @@
 1. **Frontend (`frontend/`)**: React (Vite) + Tailwind CSS + Zustand + Recharts + Lucide Icons. Real-time monitoring of cluster nodes, live progress bar, natural-language job compilation, task allocation matrix, and single-machine vs distributed benchmark chart.
 2. **Coordinator (`coordinator/`)**: Node.js + Express + Socket.IO + Mongoose. Manages push-based task scheduling, fault detection via heartbeat monitoring, deterministic task splitting, and mathematical aggregation.
 3. **Worker Agent (`worker-agent/`)**: Standalone Node.js daemon. Connects outbound (firewall friendly) via Socket.IO, reports system metrics, and executes whitelisted tasks in isolated background `worker_threads` so heartbeats are never blocked.
-4. **AI Compiler (`coordinator/src/services/aiInterpreter.js`)**: Converts human requests (e.g., *"Estimate pi with half a billion samples in chunks of 5M"*) into a validated JSON execution plan using Gemini with a regex fallback parser.
+4. **AI Compiler (`coordinator/src/services/aiInterpreter.js`)**: Converts human requests (e.g., *"Estimate pi with half a billion samples in chunks of 5M"*) into a validated JSON execution plan using Gemini 3.1 Flash-Lite with a regex fallback parser.
 
 ---
 
@@ -72,7 +72,7 @@ Open **`http://localhost:5173`** in your browser and click **"Quick 1-Click Demo
 2. **Natural Language Job Input**:
    - Go to **New Job**.
    - Type: `"Estimate pi using 200 million samples split into chunks of 5 million"`.
-   - Click **Compile with Gemini AI**.
+   - Click **Compile with Gemini 3.1 Flash-Lite**.
    - Show the validated execution preview (200M points, 40 tasks).
 3. **Live Distributed Fan-Out**:
    - Click **Dispatch Job to Cluster**.
