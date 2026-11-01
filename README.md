@@ -136,7 +136,7 @@ Distributed matrix multiplication divides the output rows of a matrix operation 
 For two matrices:
 
 \[
-C = A \times B
+C = A times B
 \]
 
 Different workers calculate different portions of the output matrix. The Coordinator collects the computed rows and reconstructs the final result.
