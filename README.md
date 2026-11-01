@@ -149,11 +149,7 @@ Monte Carlo simulation estimates the value of Pi by generating random points ins
 
 Each worker receives a subset of the total samples.
 
-The Coordinator combines the partial counts:
-
-\[
-\pi \approx 4 \times \frac{\sum \text{inside points}}{\sum \text{total points}}
-\]
+Result Aggregation: The Coordinator combines the results from all workers to calculate the final estimate of Pi based on the total points generated and the number of points inside the quarter-circle.
 
 A seeded pseudo-random number generator makes individual task results reproducible.
 
