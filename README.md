@@ -1,237 +1,466 @@
-MeshCompute AI
-One Job. Multiple Machines. Shared Computing Power.
+# MeshCompute AI
 
-MeshCompute AI turns idle personal computers into a collaborative compute cluster. It splits supported computational workloads into smaller tasks, distributes them across connected machines, and combines their results through a central coordinator.
+### One Job. Multiple Machines. Shared Computing Power.
 
-<p align="center">
-  <strong>HackCBS 9.0 · Open Innovation</strong>
-</p>The Problem
-Computers around us often have CPU cores sitting idle while other users are waiting for resource-intensive computations to finish. At the same time, scaling a workload with cloud infrastructure can introduce cost, setup complexity, and dependency on rented compute.
+MeshCompute AI is a distributed computing platform that connects multiple computers into a shared compute network. It takes computational workloads, breaks them into smaller tasks, distributes them across available machines, and combines their results.
 
-MeshCompute AI explores a different approach: use the spare computing capacity that already exists across participating computers.
+The idea is simple: **instead of letting available CPU resources sit idle while someone else waits for a computation to finish, put those resources to work together.**
 
-Instead of requiring every user to buy more hardware, multiple machines can contribute their available CPU resources to a shared pool and work on suitable parallelizable jobs together.
-Our Solution
-MeshCompute AI is a distributed computing platform with two sides:
-- Resource consumers submit a supported computation through a web dashboard, either by configuring it or describing it in natural language.
-- Resource providers run a lightweight Worker Agent that connects to the coordinator and contributes spare compute capacity.
-The coordinator validates and splits a job into smaller tasks, schedules those tasks across available workers, monitors their health, retries interrupted work, and aggregates the results.
+**HackCBS 9.0 | Open Innovation**
 
-An AI-assisted job compiler can translate a natural-language request into a structured job configuration. The generated configuration is validated against supported task schemas before execution.
-How It Works
-                 ┌──────────────────────────┐
-                 │     React Dashboard      │
-                 │ Submit jobs & monitor    │
-                 └────────────┬─────────────┘
-                              │ REST API + Socket.IO
-                              ▼
-                 ┌──────────────────────────┐
-                 │        Coordinator       │
-                 │                          │
-                 │  Job validation/splitting│
-                 │  Task scheduling         │
-                 │  Heartbeat monitoring    │
-                 │  Retry & result handling │
-                 └───────┬──────────┬───────┘
-                         │          │
-                  Socket.IO       MongoDB
-                   /workers     jobs, tasks,
-                         │       users, workers
-             ┌───────────┼───────────┐
-             ▼           ▼           ▼
-        ┌─────────┐ ┌─────────┐ ┌─────────┐
-        │ Worker  │ │ Worker  │ │ Worker  │
-        │   A     │ │   B     │ │   C     │
-        └─────────┘ └─────────┘ └─────────┘
-             Each worker executes approved task types
-             and reports results and system heartbeats.
-Execution flow
-1. A user submits a job from the dashboard.
-2. The coordinator validates the job configuration.
-3. The job splitter creates independent tasks from the workload.
-4. The scheduler assigns pending tasks to connected workers.
-5. Worker Agents execute the assigned task using the local machine's CPU.
-6. Workers send task results and periodic health updates to the coordinator.
-7. The coordinator accepts valid results, retries eligible failed or interrupted tasks, and aggregates the completed output.
-8. The dashboard receives live status updates.
-Supported Demonstration Workloads
-The current MVP includes a whitelisted task registry. Workers do not execute arbitrary user-submitted code.
-Workload	What it demonstrates
-Monte Carlo Pi Estimation	A large simulation split into independent sample batches. Partial counts are combined to estimate π.
-Matrix Multiplication	Matrix row ranges are partitioned into tasks and computed by different workers to produce the resulting matrix.
+---
 
+## The Problem
 
-The natural-language compiler currently supports these workload types. If the Gemini API key is not configured or the API is unavailable, the application can use its rule-based fallback parser.
-Scope note: This is a hackathon MVP for supported, parallelizable workloads. It is not a general-purpose cloud replacement, and distributed execution is not automatically faster for every job. Network overhead, task size, worker hardware, and coordination costs all affect performance.
+Computing power is expensive, but a surprising amount of it already exists and goes unused.
 
-Key Features
-- Distributed task execution: Divide supported jobs into smaller units and run them across multiple connected computers.
-- Live worker monitoring: View connected workers, CPU/RAM information, active tasks, and heartbeat-driven status.
-- AI-assisted job configuration: Convert natural-language requests into validated job parameters, with a fallback parser.
-- Task scheduling: Assign work to available workers based on their reported capacity and current load.
-- Fault detection and retries: Detect disconnected or unresponsive workers and make eligible unfinished tasks available for retry.
-- Result aggregation: Combine partial task outputs into a final job result.
-- Benchmark comparison: Compare a coordinator's single-machine baseline with the distributed run for supported workloads.
-- Task safety boundary: Worker Agents execute only task handlers registered in the codebase.
-Technology Stack
-Layer	Technologies
-Frontend	React, Vite, Tailwind CSS, Zustand, Recharts, Lucide
-Backend	Node.js, Express
-Real-time communication	Socket.IO
-Database	MongoDB, Mongoose
-AI integration	Google Gemini API
-Validation	Zod
-Parallel execution	Node.js worker_threads
-Shared contracts	Local meshcompute-shared workspace package
+- Personal computers spend most of their time using only a fraction of their available CPU capacity.
+- Computationally intensive workloads can take a considerable amount of time on a single machine.
+- Scaling workloads through cloud infrastructure introduces additional costs and setup complexity.
+- Most individuals and small teams cannot justify purchasing dedicated computing hardware for occasional heavy workloads.
 
+We saw an opportunity to connect these two sides: people who have spare computing resources and people who need more computing power.
 
-Repository Structure
-MeshCompute/
-├── coordinator/             # API, scheduler, sockets, models and services
+## Our Solution
+
+MeshCompute AI turns independently available computers into a collaborative computing network.
+
+It has two main participants:
+
+**Resource Providers**
+
+Run a lightweight Worker Agent on their computers and contribute available CPU resources to the network.
+
+**Resource Consumers**
+
+Submit computational jobs through a web dashboard and use the combined capacity of connected machines to execute them.
+
+A central Coordinator manages the entire process. It validates jobs, splits them into smaller tasks, allocates those tasks to available workers, monitors execution, handles failures, and aggregates the results.
+
+Users can also describe a computation in natural language. Our AI-assisted job compiler translates the request into a structured configuration that is validated before execution.
+
+The goal is to make distributed computing accessible without requiring users to manage individual machines or manually distribute workloads.
+
+---
+
+## How It Works
+
+```mermaid
+flowchart TB
+    A["React Dashboard"] -->|"REST API / Socket.IO"| B["Coordinator"]
+
+    B <-->|"Read / Write"| C[("MongoDB")]
+
+    B <-->|"AI Job Interpretation"| D["Gemini API"]
+
+    B --> E["Job Validation & Splitting"]
+    E --> F["Task Scheduler"]
+
+    F -->|"Socket.IO"| W1["Worker Agent 1"]
+    F -->|"Socket.IO"| W2["Worker Agent 2"]
+    F -->|"Socket.IO"| W3["Worker Agent N"]
+
+    W1 --> R["Task Results"]
+    W2 --> R
+    W3 --> R
+
+    R --> G["Result Aggregation"]
+    G --> B
+    B -->|"Live Updates"| A
+```
+
+### Execution Pipeline
+
+1. **Job Submission:** A user submits a computational workload through the dashboard, either manually or using natural language.
+
+2. **AI-Assisted Compilation:** Gemini interprets natural-language requests and generates a structured job configuration. A schema validator checks the generated configuration against supported workloads.
+
+3. **Job Splitting:** The Coordinator divides the workload into smaller, independently executable tasks.
+
+4. **Resource Allocation:** The Scheduler selects available workers based on their active task capacity and reported CPU load.
+
+5. **Distributed Execution:** Worker Agents execute assigned tasks using Node.js worker threads, keeping their communication event loop responsive.
+
+6. **Monitoring and Recovery:** Workers send periodic heartbeats. If a worker disconnects, eligible unfinished tasks can be reassigned to other available workers.
+
+7. **Result Aggregation:** The Coordinator validates and combines partial results into the final output.
+
+8. **Live Visualization:** The dashboard receives real-time updates about workers, task allocation, execution progress, and job completion.
+
+---
+
+## Key Features
+
+### Distributed Computing
+- Connect multiple independent computers through a central Coordinator.
+- Execute computational workloads across multiple worker machines.
+- Automatically divide jobs into smaller tasks.
+- Aggregate partial results into a single output.
+
+### AI-Assisted Job Compiler
+- Convert natural-language requests into structured job configurations.
+- Use Gemini API for job interpretation.
+- Validate generated configurations before execution.
+- Provide a rule-based fallback parser when the AI service is unavailable.
+
+### Intelligent Task Scheduling
+- Allocate tasks according to worker availability.
+- Consider free task slots and reported CPU load.
+- Distribute smaller tasks to support load balancing.
+- Trigger scheduling when jobs are submitted, workers connect, or tasks complete.
+
+### Fault Tolerance
+- Periodic worker heartbeats.
+- Automatic offline-worker detection.
+- Reassignment of eligible interrupted tasks.
+- Attempt-aware result handling to prevent stale or duplicate completions.
+- Configurable retry limits.
+
+### Real-Time Dashboard
+- Monitor connected workers and their machine information.
+- View CPU and available RAM metrics.
+- Track individual task allocation and execution.
+- Monitor job progress in real time.
+- Access completed jobs and execution history.
+
+---
+
+## Supported Computational Workloads
+
+The current implementation includes two computational workloads.
+
+### 1. Matrix Multiplication
+
+Distributed matrix multiplication divides the output rows of a matrix operation into smaller chunks.
+
+For two matrices:
+
+\[
+C = A \times B
+\]
+
+Different workers calculate different portions of the output matrix. The Coordinator collects the computed rows and reconstructs the final result.
+
+The implementation uses deterministic integer matrices, making individual results straightforward to verify.
+
+### 2. Monte Carlo Pi Estimation
+
+Monte Carlo simulation estimates the value of Pi by generating random points inside a unit square and counting how many fall inside a quarter-circle.
+
+Each worker receives a subset of the total samples.
+
+The Coordinator combines the partial counts:
+
+\[
+\pi \approx 4 \times \frac{\sum \text{inside points}}{\sum \text{total points}}
+\]
+
+A seeded pseudo-random number generator makes individual task results reproducible.
+
+---
+
+## Technology Stack
+
+| Component | Technologies |
+|---|---|
+| Frontend | React, Vite, Tailwind CSS |
+| State Management | Zustand |
+| Backend | Node.js, Express |
+| Real-Time Communication | Socket.IO |
+| Database | MongoDB, Mongoose |
+| AI Integration | Google Gemini API |
+| Validation | Zod |
+| Authentication | JWT, bcryptjs |
+| Parallel Execution | Node.js Worker Threads |
+| Testing | Vitest |
+| Architecture | Monorepo with npm Workspaces |
+
+---
+
+## Project Structure
+
+```text
+MeshCompute-AI/
+│
+├── coordinator/
 │   └── src/
+│       ├── config.js
+│       ├── index.js
 │       ├── middleware/
 │       ├── models/
 │       ├── routes/
-│       ├── scripts/
+│       ├── sockets/
 │       ├── services/
-│       └── sockets/
-├── frontend/                # React dashboard
+│       │   ├── aiInterpreter.js
+│       │   ├── aggregator.js
+│       │   ├── baselineRunner.js
+│       │   ├── heartbeatMonitor.js
+│       │   ├── jobSplitter.js
+│       │   └── scheduler.js
+│       └── tests/
+│
+├── frontend/
 │   └── src/
 │       ├── components/
-│       ├── lib/
 │       ├── pages/
-│       └── store/
-├── worker-agent/            # Installable compute worker
+│       ├── store/
+│       └── lib/
+│
+├── worker-agent/
 │   └── src/
-│       ├── tasks/
 │       ├── index.js
 │       ├── sysinfo.js
 │       ├── taskRunner.js
-│       └── workerThread.js
-├── shared/                  # Shared task types, events and limits
-├── scripts/                 # Demo and seed scripts
+│       ├── workerThread.js
+│       └── tasks/
+│           ├── matrixMultiply.js
+│           └── montecarloPi.js
+│
+├── shared/
+│   └── constants.js
+│
+├── scripts/
+│   ├── demo.js
+│   └── seedDemoData.js
+│
 ├── .env.example
+├── package.json
 └── README.md
-Getting Started
-Prerequisites
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+
 - Node.js 20 or later
 - npm 9 or later
-- MongoDB instance (local or hosted)
-- Gemini API key (optional; the rule-based parser can be used without it)
-1. Clone the repository
-git clone <YOUR_REPOSITORY_URL>
-cd hackCBS9.0-main
-2. Install dependencies
-Run this from the repository root:
+- MongoDB running locally or a MongoDB Atlas connection string
+- Google Gemini API key (optional, for AI-powered job interpretation)
+
+### 1. Clone the Repository
+
+```bash
+git clone <https://github.com/AuritroDeyKirty07/hackCBS9.0.git>
+cd MeshCompute-AI
+```
+
+### 2. Install Dependencies
+
+```bash
 npm install
-The project uses npm workspaces, so this installs dependencies for the frontend, coordinator, worker agent, and shared package.
-3. Configure environment variables
-Copy the example file:
+```
+
+### 3. Configure Environment Variables
+
+Create a `.env` file in the project root using the example configuration:
+
+```bash
 cp .env.example .env
-On Windows Command Prompt:
-copy .env.example .env
-Update .env:
+```
+
+Configure the following variables:
+
+```env
 # Coordinator
 PORT=4000
 MONGODB_URI=mongodb://localhost:27017/meshcompute
-JWT_SECRET=replace-with-a-long-random-secret
+JWT_SECRET=your-secret-key
 GEMINI_API_KEY=your-gemini-api-key
+
+HEARTBEAT_INTERVAL_MS=3000
+HEARTBEAT_TIMEOUT_MS=10000
+TASK_TIMEOUT_MS=60000
+MAX_SAMPLES_PER_JOB=2000000000
+MAX_ATTEMPTS=3
 
 # Worker
 COORDINATOR_URL=http://localhost:4000
 WORKER_TOKEN=meshcompute-demo-worker-token
 WORKER_NAME=worker-1
+MAX_CORES=4
 MAX_CONCURRENT_TASKS=4
-GEMINI_API_KEY is optional. Without it, natural-language job requests use the fallback parser.
+```
 
-For a hosted MongoDB database, replace MONGODB_URI with your MongoDB connection string.
-4. Start the demo
+The compiler has a rule-based fallback when the API is unavailable.
+
+### 4. Start the Application
+
+Make sure MongoDB is running, then execute:
+
+```bash
 npm run demo
-The demo script attempts to seed a demo account and sample completed job, then starts the coordinator, one local worker, and the frontend.
+```
 
-Open:
-- Dashboard: http://localhost:5173
-- Coordinator health check: http://localhost:4000/health
-Demo login:
-Email:    demo@meshcompute.ai
+The demo script seeds demonstration data and starts the Coordinator, a local Worker Agent, and the frontend.
+
+Open the dashboard:
+
+```text
+http://localhost:5173
+```
+
+Demo credentials:
+
+```text
+Email: demo@meshcompute.ai
 Password: password123
-The demo worker token is:
-meshcompute-demo-worker-token
-If the demo script cannot connect to MongoDB, the database must be started or the .env connection string corrected before the coordinator can run.
-Connect More Computers
-The central idea is that worker machines connect outbound to the coordinator. They do not need to accept inbound connections from other workers.
-1. Make the coordinator reachable
-For computers on the same LAN, use the coordinator machine's private LAN IP address, for example:
-http://192.168.1.10:4000
-Make sure the coordinator machine's firewall allows incoming connections to the coordinator port from the worker machines.
+```
 
-For computers outside the LAN, the coordinator needs a reachable HTTPS/WSS endpoint. Configure your deployment or secure tunnel accordingly. Do not expose a development server with default secrets to the public internet.
-2. Start a worker on another computer
-Clone the repository on the worker computer and install dependencies:
+### 5. Connect Additional Computers
+
+One of the main ideas behind MeshCompute AI is that workers do not need to run on the same computer as the dashboard.
+
+Start the Coordinator on a machine reachable by other computers on the network.
+
+On another computer, clone the repository and install dependencies:
+
+```bash
 npm install
-Set the coordinator URL and worker credentials in that machine's environment:
-COORDINATOR_URL=http://192.168.1.10:4000
-WORKER_TOKEN=meshcompute-demo-worker-token
+```
+
+Configure its environment:
+
+```env
+COORDINATOR_URL=http://<COORDINATOR_IP>:4000
+WORKER_TOKEN=<VALID_WORKER_TOKEN>
 WORKER_NAME=worker-laptop-2
+MAX_CORES=4
 MAX_CONCURRENT_TASKS=4
-Then run:
+```
+
+Then start the Worker Agent:
+
+```bash
 npm run worker
-Repeat with a unique WORKER_NAME for each additional computer.
+```
 
-The worker token must be valid for the coordinator's worker authentication configuration. The demo token above is for the seeded demo setup only; use properly managed credentials for any non-demo deployment.
-3. Verify the cluster
-Open the dashboard's Workers view. Connected agents should register and report machine information and periodic heartbeat metrics. Submit a supported job to see task allocation and progress.
-Important: For remote workers, COORDINATOR_URL must point to the reachable coordinator host, not localhost. On a remote machine, localhost refers to that worker itself.
+Repeat this process for additional machines, using a unique worker name for each one.
 
-Run Services Individually
-You can start each service separately from the repository root:
-# Backend coordinator
+Workers establish outbound connections to the Coordinator using Socket.IO. They do not need to expose their own inbound ports.
+
+For machines outside the local network, the Coordinator must have a publicly reachable HTTPS/WSS endpoint.
+
+---
+
+## Running Individual Services
+
+Instead of starting the complete demo, services can also be started separately.
+
+**Backend Coordinator**
+
+```bash
 npm run dev:coordinator
+```
 
-# Frontend dashboard
+**Frontend Dashboard**
+
+```bash
 npm run dev:frontend
+```
 
-# Worker agent
+**Worker Agent**
+
+```bash
 npm run worker
-The frontend uses these optional Vite variables:
+```
+
+For a separately deployed frontend, configure:
+
+```env
 VITE_API_URL=http://localhost:4000/api
 VITE_COORDINATOR_URL=http://localhost:4000
-For a deployed frontend, set both variables to the deployed coordinator's public URL before building the frontend.
-Tests and Build
-Run the coordinator test suite:
+```
+
+Replace the local URLs with the deployed Coordinator URL when deploying the frontend.
+
+---
+
+## Testing and Build
+
+Run the Coordinator test suite:
+
+```bash
 npm test
-Run worker-agent tests:
+```
+
+Run Worker Agent tests:
+
+```bash
 npm -w worker-agent test
+```
+
 Build the frontend:
+
+```bash
 npm -w frontend run build
-Security and Reliability
-The MVP includes several safeguards:
-- Whitelisted task handlers: Workers resolve task types through a local registry rather than evaluating arbitrary user code.
-- Schema validation: Job configurations are validated before task creation.
-- Worker authentication: Worker connections are authenticated using a token.
-- Heartbeats: Workers periodically report liveness and resource metrics.
-- Retry handling: Eligible interrupted tasks can be reassigned, subject to retry limits.
-- Attempt-aware result handling: Results are associated with task attempts to help reject stale or duplicate completions.
-- Worker-thread execution: CPU-intensive task handlers run in worker threads so the agent's main event loop can continue handling communication.
-Before production use
-This repository is a hackathon prototype, not a production-hardened compute marketplace. A production deployment would need, at minimum:
-- Strict CORS and origin allowlists.
-- Strong secret and token rotation, plus per-worker credentials.
-- TLS for all public traffic.
-- Stronger isolation and resource quotas for worker processes.
-- Explicit contributor consent, workload transparency, and privacy controls.
-- More comprehensive input limits, abuse prevention, observability, and recovery testing.
-- Independent verification strategies for untrusted or non-deterministic workloads.
-Current Limitations
-- Only the task types implemented in the worker registry are executable.
-- The coordinator is a central dependency; this is not yet a peer-to-peer network.
-- Worker availability and speed depend on the contributor's machine, power state, and network connection.
-- Communication and scheduling overhead can outweigh parallel-compute gains for small workloads.
-- The AI compiler assists with job configuration; it does not generate or execute arbitrary programs.
-- The current benchmark is workload- and hardware-dependent. Results should be measured on the actual machines used in a demo.
-Future Scope
-- Add more safe, independently parallelizable workloads such as batch image processing and data transformations.
-- Improve scheduling using historical worker performance and live resource availability.
-- Add stronger sandboxing, per-worker quotas, and contributor controls.
-- Explore peer-to-peer worker discovery and transport.
-- Introduce verifiable compute and transparent contribution accounting.
+```
+
+---
+
+## Engineering Decisions
+
+A few decisions were particularly important while building this system.
+
+**1. Why a central Coordinator?**
+
+A central Coordinator gives us one place to manage job states, worker availability, task allocation, and result aggregation. It also simplifies the initial implementation compared with building a peer-to-peer network.
+
+**2. Why Socket.IO?**
+
+Workers need to receive tasks and report results without repeatedly polling the server. Socket.IO provides persistent, bidirectional communication and allows the dashboard to receive live updates.
+
+**3. Why Worker Threads?**
+
+CPU-intensive computations can block the Node.js event loop. Running computation in worker threads allows the agent to continue sending heartbeats and handling communication while tasks execute.
+
+**4. Why deterministic tasks?**
+
+Reproducibility makes debugging and verification easier. It also helps prevent incorrect aggregation when tasks are retried.
+
+**5. Why validate AI-generated configurations?**
+
+An LLM should not be trusted to define executable workloads without restrictions. MeshCompute AI only accepts supported task types and validates their parameters before execution. It does not execute arbitrary AI-generated code.
+
+---
+
+## Current Limitations
+
+MeshCompute AI is a working hackathon prototype, not yet a production-grade distributed computing marketplace.
+
+Current limitations include:
+
+- Only implemented and whitelisted workload types can be executed.
+- The Coordinator remains a central dependency.
+- Actual performance depends on worker hardware, network conditions, and workload size.
+- Communication and scheduling overhead can outweigh the benefits of distribution for smaller jobs.
+- Public deployment requires additional security hardening and worker isolation.
+- The current worker execution model needs stronger sandboxing and resource controls before accepting untrusted workloads.
+
+We believe being honest about these limitations is just as important as demonstrating what the system can do.
+
+---
+
+## What's Next?
+
+There is plenty of room to take this further.
+
+- Support additional workloads such as batch image processing and large-scale data transformations.
+- Improve resource allocation using historical worker performance.
+- Introduce stronger sandboxing and resource quotas.
+- Build a more decentralized worker discovery and communication layer.
+- Introduce transparent contribution accounting and verifiable computation.
+- Improve benchmarking across different hardware configurations.
+
+---
+
+## The Bigger Picture
+
+We don't believe every computational problem needs another expensive machine.
+
+There are already millions of computers with processing capacity that goes unused every day. MeshCompute AI is an attempt to connect that existing capacity and make it useful.
+
+Instead of thinking about computing power as something owned by a single machine, we want to explore what becomes possible when multiple machines work together.
+
+**One Job. Multiple Machines. Shared Computing Power.**
